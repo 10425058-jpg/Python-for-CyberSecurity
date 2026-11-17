@@ -4,6 +4,24 @@
 
 > **Safety:** Operate only on systems, traffic and data you own or have explicit written permission to assess. The repository uses synthetic data and loopback-first examples. Tools are educational, not production-hardened scanners or forensic acquisition systems.
 
+## Start with the **Second Edition: Deep Dive**
+
+The older `python/` and `security/` pages are **short topic overviews**. The new [**22-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.
+
+**Recommended reading order:**
+
+1. [Python internals, types, control flow and data structures](course/README.md#learning-path) — Units 01–03.
+2. [Bytes, binary protocols, trusted parsing and SQL](course/04-BYTES-ENCODING-BINARY-PARSERS.md) — Units 04–05.
+3. [Architecture, testing, concurrency and OS](course/06-TYPING-OOP-ARCHITECTURE.md) — Units 06–08.
+4. [Networking, web/API security and cryptography](course/09-NETWORKING-DNS-TCP-TLS.md) — Units 09–11.
+5. [SOC, DFIR, PCAP and malware triage](course/12-SOC-DETECTION-ENGINEERING.md) — Units 12–15.
+6. [Cloud, vulnerabilities, endpoint telemetry and capstone](course/16-CLOUD-CONTAINERS-DEVSECOPS.md) — Units 16–19.
+7. [Advanced Python internals, anomaly detection and regex](course/20-ADVANCED-PYTHON-PERFORMANCE.md) — Units 20–22.
+
+**Full worked answer bank:** [12 complete solutions with reasoning and tests](solutions/WORKED-SOLUTIONS.md).
+
+**Guided, executable workshops:** [binary framing](workshops/01-BINARY-FRAMING.md), [offline mini SOC](workshops/02-MINI-SOC-DETECTION.md), [cryptography](workshops/03-CRYPTOGRAPHY-LAB.md), [incident timelines](workshops/04-INCIDENT-TIMELINE.md). Check [new standard-library examples](examples/strict_frame.py), [atomic mini SOC](examples/mini_soc_pipeline.py) and [their tests](tests/test_deep_examples.py).
+
 ## Choose your entry point
 | Your background | Begin here | Then |
 |---|---|---|
@@ -25,10 +43,12 @@
 ## Run the examples
 ```bash
 git clone https://github.com/10425058-jpg/Python-for-CyberSecurity.git
-cd CyberSecurity-
+cd Python-for-CyberSecurity
 python -m venv .venv
 # Activate your venv using instructions in python/00-START-HERE.md
 python -m unittest discover -s tests -v
+python -m examples.mini_soc_pipeline --input fixtures/synthetic-auth.jsonl --output findings.jsonl
+python -m examples.strict_frame
 python -m examples.log_detector fixtures/synthetic-auth.jsonl
 python -m examples.file_manifest fixtures
 python -m examples.indicator_normalizer fixtures/synthetic-indicators.jsonl
@@ -36,7 +56,7 @@ python -m examples.local_port_check 8080
 ```
 
 ## What this resource does and does not claim
-The content is a **broad, structured first edition**, not a claim to cover every evolving Python library, protocol, operating system, threat technique or framework exhaustively. Chapters provide conceptual coverage and initial examples; specialist production skills require current vendor docs, deeper courses, supervised experience and ongoing updates. Learn defensive fundamentals first; document uncertainty and limitations.
+This repository now contains a **detailed second-edition core** plus short overviews. Although substantially expanded, it still cannot exhaustively cover every changing Python library, protocol, OS, cybersecurity specialty or attack technique. Advanced production work requires current vendor docs, lab practice, peer review and supervised experience. The exercises are defensive and local-first; example tools are not forensic-grade or production hardened.
 
 ## Other learning materials
 This repository is exclusively dedicated to Python for Cybersecurity. General cybersecurity material lives separately at [CyberSecurity-](https://github.com/10425058-jpg/CyberSecurity-).

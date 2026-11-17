@@ -1,4 +1,6 @@
 # Threat intelligence, OSINT and privacy-respecting enrichment
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [malware triage threat intelligence](../course/15-MALWARE-TRIAGE-THREAT-INTELLIGENCE.md).
+
 
 ## Intelligence concepts
 Data → information → analyzed intelligence → decision. IOC (IP/domain/hash), behavior, TTP, actor/campaign hypothesis and vulnerability are different artifacts. Attributes include source, collection time, confidence, expiration, classification, license and permitted sharing.

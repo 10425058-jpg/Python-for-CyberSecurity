@@ -1,4 +1,8 @@
 # Advanced defense research, statistics and specialization
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [mini soc capstone blueprint](../course/18-MINI-SOC-CAPSTONE-BLUEPRINT.md).
+
+
+> **New specialist unit:** [Statistics, anomaly detection, machine-learning pitfalls and measured quality](../course/21-STATISTICS-ANOMALY-DETECTION-ML.md).
 
 ## Security analytics and ML
 Build hypotheses first; machine learning is not a substitute for good telemetry. Learn descriptive statistics, conditional probability, base rates, precision/recall/F1, ROC and PR curves, class imbalance, time-series leakage, concept drift, calibration, cross-validation and explainability. An anomaly score is not proof of malicious activity.

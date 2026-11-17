@@ -1,4 +1,6 @@
 # Packet analysis with Python and offline PCAPs
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [pcap and protocol forensics](../course/14-PCAP-AND-PROTOCOL-FORENSICS.md).
+
 
 ## Packet anatomy
 Ethernet → IP → TCP/UDP → application. Headers carry metadata: source/destination MAC/IP/ports, protocol, sequence numbers, flags and lengths. Parsing raw bytes requires correct link-layer type, fragmentation handling, endianness and bounds. A TCP payload may contain only part of an application message.

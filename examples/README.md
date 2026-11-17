@@ -2,8 +2,16 @@
 
 All examples use synthetic/local data. Most require only the Python standard library. `offline_pcap.py` optionally needs Scapy and works on **offline** user-supplied PCAP files. A reachable TCP port does not imply a vulnerability; entropy does not imply malware; log alerts require human review.
 
+## Deep-dive, end-to-end examples
+
+- [Strict toy binary frame parser](strict_frame.py): validates magic/version/type/length, strict UTF-8 JSON, duplicate keys, malformed input and payload caps. Guided [Workshop 01](../workshops/01-BINARY-FRAMING.md).
+- [Advanced offline mini SOC pipeline](mini_soc_pipeline.py): bounded JSONL, UTC normalization, source-qualified dedup, event-time threshold logic and atomic report writes. Guided [Workshop 02](../workshops/02-MINI-SOC-DETECTION.md).
+- [Unit tests for both](../tests/test_deep_examples.py) cover bad inputs, window reset and output atomicity.
+
 ## Commands
 ```bash
+python -m examples.strict_frame
+python -m examples.mini_soc_pipeline --input fixtures/synthetic-auth.jsonl --output findings.jsonl
 python -m examples.file_manifest fixtures
 python -m examples.log_detector fixtures/synthetic-auth.jsonl --threshold 3
 python -m examples.local_port_check 80 443 8080

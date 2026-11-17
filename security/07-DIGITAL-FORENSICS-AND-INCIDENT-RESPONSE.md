@@ -1,4 +1,6 @@
 # Digital forensics and incident response (DFIR)
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [dfir evidence and timelines](../course/13-DFIR-EVIDENCE-AND-TIMELINES.md).
+
 
 ## Lifecycle and standards
 Use [NIST SP 800-61 Rev. 3](https://csrc.nist.gov/pubs/sp/800/61/r3/final) (April 2025) together with organizational policies. Preparation, governance and protection support effective detection, response and recovery. The older Rev. 2 lifecycle remains common in legacy material but has been superseded.

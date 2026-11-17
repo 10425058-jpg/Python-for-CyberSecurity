@@ -1,4 +1,6 @@
 # Log analytics, SOC automation and detection engineering
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [soc detection engineering](../course/12-SOC-DETECTION-ENGINEERING.md).
+
 
 ## Telemetry sources
 Application, authentication, operating system, endpoint, DNS, HTTP, proxy, firewall, cloud audit and container audit logs. Each has coverage gaps and different trust, delay and retention properties. Syslog, Windows Event Logs, JSONL, CSV, OpenTelemetry formats and vendor APIs require normalization.

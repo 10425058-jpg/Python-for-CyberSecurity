@@ -1,4 +1,6 @@
 # Security engineering: authorization, ethics and threat modeling
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [mini soc capstone blueprint](../course/18-MINI-SOC-CAPSTONE-BLUEPRINT.md) · [web api authorization security](../course/10-WEB-API-AUTHORIZATION-SECURITY.md).
+
 
 ## Scope of the handbook
 The goal is to learn how Python helps defenders inspect *their own* systems, handle evidence, secure software, and automate authorized assessments. Real systems contain private data; even a seemingly read-only scan can trigger alerts or impact availability. Obtain written authorization specifying targets, methods, times, evidence handling, emergency contacts and permitted traffic volumes. Default labs to loopback, offline PCAPs, or isolated virtual networks.

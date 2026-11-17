@@ -1,4 +1,6 @@
 # Linux, Windows and endpoint telemetry for Python defenders
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [endpoint os telemetry](../course/19-ENDPOINT-OS-TELEMETRY.md).
+
 
 ## Linux
 Key concepts: users/groups, permissions, sudo/polkit, systemd services, journald, syslog, cron, sockets, processes, namespaces, auditd, firewall/nftables, SELinux/AppArmor and SSH. Sources may include journald JSON exports, auth logs, audit logs and EDR agent events. Access requires privilege and privacy controls.

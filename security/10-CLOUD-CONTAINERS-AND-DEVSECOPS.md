@@ -1,4 +1,6 @@
 # Cloud, containers and DevSecOps with Python
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [cloud containers devsecops](../course/16-CLOUD-CONTAINERS-DEVSECOPS.md).
+
 
 ## Concepts before SDKs
 Shared responsibility, IAM principals/roles, temporary credentials, network policies, encryption at rest/in transit, audit logs, object storage ACLs, secrets management, container image provenance and workload identity. A cloud service being reachable does not make querying it authorized.

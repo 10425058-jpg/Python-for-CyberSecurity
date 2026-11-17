@@ -1,4 +1,6 @@
 # 06 — Object-oriented design and maintainable security tools
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [typing oop architecture](../course/06-TYPING-OOP-ARCHITECTURE.md).
+
 
 ## Core concepts
 - **Class:** declares a type's data and behavior; **instance:** concrete object.

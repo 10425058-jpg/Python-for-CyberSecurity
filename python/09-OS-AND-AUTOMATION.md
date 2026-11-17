@@ -1,4 +1,6 @@
 # 09 — Operating-system automation with Python
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [concurrency async os automation](../course/08-CONCURRENCY-ASYNC-OS-AUTOMATION.md) · [endpoint os telemetry](../course/19-ENDPOINT-OS-TELEMETRY.md).
+
 
 ## Core libraries
 `os`, `sys`, `pathlib`, `shutil`, `tempfile`, `subprocess`, `signal`, `platform`, `stat`, `getpass`, `logging`, `time` and `datetime`. Learn filesystem permissions, process ownership, environment variables, UIDs/GIDs, Windows tokens, services, scheduled jobs, and shell quoting.

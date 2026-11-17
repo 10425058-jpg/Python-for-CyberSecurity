@@ -1,4 +1,6 @@
 # 03 — Functions, modules, typing, and API design
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [control flow functions errors](../course/02-CONTROL-FLOW-FUNCTIONS-ERRORS.md) · [typing oop architecture](../course/06-TYPING-OOP-ARCHITECTURE.md).
+
 
 ## Good function boundaries
 A function should have one clear responsibility, documented inputs/outputs, predictable failures, and no unnecessary hidden I/O. Separate **parse → validate → analyze → report** so that each stage can be tested independently. Prefer dependency injection to global state.

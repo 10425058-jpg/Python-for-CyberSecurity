@@ -2,6 +2,8 @@
 
 This schedule is an ambitious introduction to Python security engineering. Mastery takes longer and depends on project feedback. Adjust pace based on tests and depth, not calendar alone.
 
+> **Deep-dive supplement:** The [22-unit Second Edition](../course/README.md) has step-by-step explanations, worked examples and four guided workshops. Spend as long as needed on each unit; the monthly schedule is a pacing aid, not a mastery guarantee.
+
 ## 12-month plan
 | Month | Python knowledge | Security context | Deliverable |
 |---|---|---|---|
@@ -25,8 +27,8 @@ This schedule is an ambitious introduction to Python security engineering. Maste
 - Day 4: 60 min reading source docs + 30 min debugging.
 - Day 5: 90 min tests and edge cases.
 - Day 6: 120 min lab, experiment and written findings.
-- Day 7: 60 min retrospective or rest/adjustment.
-Total: 10 hours when completed as scheduled.
+- Day 7: 30 min retrospective or rest/adjustment.
+Total: 10 hours when completed as scheduled (five 90-minute sessions + one 120-minute session + one 30-minute review).
 
 ## Suggested quarterly gates
 - Q1: confident with pure Python, functions, safe parsing and basic testing.

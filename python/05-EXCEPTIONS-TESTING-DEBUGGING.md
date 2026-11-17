@@ -1,4 +1,6 @@
 # 05 — Error handling, tests, debugging and observability
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [testing ci and supply chain](../course/07-TESTING-CI-AND-SUPPLY-CHAIN.md).
+
 
 ## Exception design
 Use `try` only around the statement that can fail; catch specific exceptions. Preserve stack traces with `raise` and chain causes with `raise NewError(...) from exc` when translating failures. Never return a successful-looking empty result after an unexpected exception.

@@ -1,4 +1,6 @@
 # Secure data pipelines, SQL, telemetry storage and SIEM integrations
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [files json sql trust boundaries](../course/05-FILES-JSON-SQL-TRUST-BOUNDARIES.md) · [soc detection engineering](../course/12-SOC-DETECTION-ENGINEERING.md).
+
 
 ## Storage choices
 - SQLite: local analysis and lightweight state; transactional, embedded.

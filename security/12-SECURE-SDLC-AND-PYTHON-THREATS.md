@@ -1,4 +1,6 @@
 # Secure Python software development lifecycle
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [testing ci and supply chain](../course/07-TESTING-CI-AND-SUPPLY-CHAIN.md) · [web api authorization security](../course/10-WEB-API-AUTHORIZATION-SECURITY.md).
+
 
 ## Python-specific attack surfaces
 - **Command injection:** `os.system` and `subprocess` with concatenated shell input.

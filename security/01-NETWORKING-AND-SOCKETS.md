@@ -1,4 +1,6 @@
 # Networking with Python: sockets, DNS and safe diagnostics
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [networking dns tcp tls](../course/09-NETWORKING-DNS-TCP-TLS.md).
+
 
 ## Prerequisites
 Understand OSI vs TCP/IP models, Ethernet, ARP, IPv4/IPv6, CIDR, subnets, routing, DNS, DHCP, NAT, TLS, UDP, TCP, ports, connection states, and HTTP. Client and server addresses/ports form endpoints; a firewall may block a connection even when an application is running.

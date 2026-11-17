@@ -1,4 +1,6 @@
 # 11 — Python internals, performance and advanced topics
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [collections complexity streams](../course/03-COLLECTIONS-COMPLEXITY-STREAMS.md) · [concurrency async os automation](../course/08-CONCURRENCY-ASYNC-OS-AUTOMATION.md).
+
 
 ## Language mechanics
 Understand scopes (LEGB), closures, descriptors, properties, dunder methods, metaclasses (only when justified), decorators, generators, coroutine state, exception groups, pattern matching, typing protocols, and the import system. Learn how mutable references and garbage collection affect long-running agents.
