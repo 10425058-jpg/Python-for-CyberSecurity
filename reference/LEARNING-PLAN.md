@@ -4,6 +4,10 @@ This schedule is an ambitious introduction to Python security engineering. Maste
 
 > **Deep-dive supplement:** The [22-unit Second Edition](../course/README.md) has step-by-step explanations, worked examples and four guided workshops. Spend as long as needed on each unit; the monthly schedule is a pacing aid, not a mastery guarantee.
 
+## Guided study and portfolio integration
+
+Complete [each chapter's guided lab](../lab-manual/README.md), then attempt the matching items in [100 Exercises](100-EXERCISES.md) before reading the [numbered worked solutions](../solutions/by-exercise/README.md). Use the [build path](../projects/BUILD-PATH.md) after the first Python chapters to turn knowledge into graded portfolio artifacts.
+
 ## 12-month plan
 | Month | Python knowledge | Security context | Deliverable |
 |---|---|---|---|

@@ -186,11 +186,11 @@ def detect_bursts(
         queue = windows.setdefault(event.actor, deque())
         while queue and event.timestamp_utc - queue[0].timestamp_utc > window:
             queue.popleft()
-        if len(queue) < threshold:
-            signaled.discard(event.actor)  # rearm when count drops below threshold
         if len(queue) >= max_queue_per_actor:
             raise ValueError("per-actor queue cap exceeded")
         queue.append(event)
+        if len(queue) < threshold:
+            signaled.discard(event.actor)  # only rearm after post-arrival count falls
         if len(queue) >= threshold and event.actor not in signaled:
             signaled.add(event.actor)
             supporting = list(queue)[-threshold:]

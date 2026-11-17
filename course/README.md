@@ -2,6 +2,10 @@
 
 **All 22 chapters have been expanded with additional executable case studies, trace tables, failure-mode discussion, exercises and solution cues.** This is the detailed, explanation-first track. The short pages in `python/` and `security/` are retained as **quick-reference overviews**. The units here contain the deeper conceptual lessons, explanatory traces, annotated Python, security failure modes, worked checks and end-of-unit assignments. Every active exercise is offline or loopback-only, using authorized/synthetic data.
 
+## Applied practice with 22 labs and 100 answers
+
+Every chapter now links to its own [step-by-step guided lab](../lab-manual/README.md). The [100-solution answer bank](../solutions/by-exercise/README.md) expands all original exercise prompts into runnable or defensible answers, and the [project build path](../projects/BUILD-PATH.md) provides tested starter programs for integrity monitoring, IOC quality, evidence timelines and detection evaluation.
+
 ## How to learn efficiently
 
 For each unit:

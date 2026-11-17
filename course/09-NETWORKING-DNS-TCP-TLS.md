@@ -1,5 +1,7 @@
 # Deep Dive 09 — TCP/IP, sockets, DNS, TLS and network defensive programming
 
+> **Hands-on:** [Chapter 09 Guided Lab](../lab-manual/09-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Run negative tests and document limitations.
+
 **Level:** intermediate · **Estimated study:** 12–16 hours.
 
 ## Scenario

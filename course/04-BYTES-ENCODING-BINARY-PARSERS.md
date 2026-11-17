@@ -1,5 +1,7 @@
 # Deep Dive 04 — Bytes, Unicode, binary protocols and untrusted parsers
 
+> **Hands-on:** [Chapter 04 Guided Lab](../lab-manual/04-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** intermediate · **Estimated study:** 8–12 hours · **Prerequisites:** types, functions, file I/O.
 
 ## Objective

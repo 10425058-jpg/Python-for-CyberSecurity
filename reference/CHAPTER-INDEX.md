@@ -49,6 +49,11 @@ A **beginner** can explain syntax and write/tests a small program. An **intermed
 - [Validated policy, toy auth log, authorization, metrics and SQLite importer](../examples/chapter_cases.py) with [regression tests](../tests/test_chapter_cases.py).
 - [22 in-depth chapters](../course/README.md) now contain more trace-based explanations and chapter-level exercises.
 
+## New: practical curriculum
+- [All 22 guided labs](../lab-manual/README.md) linked to the corresponding chapters.
+- [All 100 numbered worked answers](../solutions/by-exercise/README.md).
+- [Offline portfolio build path with four tested tools](../projects/BUILD-PATH.md).
+
 ## Worked answers
 - [12 fully solved representative exercises](../solutions/WORKED-SOLUTIONS.md) with code, tests and security rationale.
 

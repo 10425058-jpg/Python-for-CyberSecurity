@@ -1,5 +1,7 @@
 # Deep Dive 17 — Vulnerability management, risk and Python parser fuzzing
 
+> **Hands-on:** [Chapter 17 Guided Lab](../lab-manual/17-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Test realistic error conditions before proceeding.
+
 **Level:** intermediate → advanced · **Estimated study:** 12–16 hours.
 
 ## 1. Severity is not the same as organizational risk

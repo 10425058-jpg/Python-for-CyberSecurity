@@ -1,4 +1,6 @@
-# Worked Solutions — 12 Python for Cybersecurity exercises
+# Worked Solutions — 12 selected Python for Cybersecurity exercises
+
+> For complete numbered answers to **all 100** original exercises, see the [100-solution index](by-exercise/README.md). This document preserves 12 representative longer worked examples.
 
 **Purpose:** These are complete, explained solutions to representative exercises from the [Second Edition](../course/README.md). They complement rather than replace the larger [100-exercise bank](../reference/100-EXERCISES.md). Try first without looking here. All exercises use local/synthetic data.
 
@@ -280,9 +282,9 @@ def crossings(times: list[int], *, threshold: int = 3, span: int = 60):
     for t in times:
         while q and t - q[0] > span:
             q.popleft()
+        q.append(t)
         if len(q) < threshold:
             active = False
-        q.append(t)
         if len(q) >= threshold and not active:
             alerts.append(t)
             active = True

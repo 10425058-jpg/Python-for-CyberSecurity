@@ -1,5 +1,7 @@
 # Deep Dive 22 — Regular expressions, untrusted log text and safe parsing strategies
 
+> **Hands-on:** [Chapter 22 Guided Lab](../lab-manual/22-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Test realistic error conditions before proceeding.
+
 **Level:** beginner → intermediate · **Estimated study:** 7–10 hours.
 
 ## Goal

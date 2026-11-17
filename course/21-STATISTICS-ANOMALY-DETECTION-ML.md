@@ -1,5 +1,7 @@
 # Deep Dive 21 — Statistics, anomaly detection and machine-learning pitfalls in cybersecurity
 
+> **Hands-on:** [Chapter 21 Guided Lab](../lab-manual/21-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Test realistic error conditions before proceeding.
+
 **Level:** intermediate → advanced · **Estimated study:** 12–18 hours.
 
 ## Goal

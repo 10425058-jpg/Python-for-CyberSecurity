@@ -1,5 +1,7 @@
 # Deep Dive 19 — Linux, Windows and endpoint telemetry with Python
 
+> **Hands-on:** [Chapter 19 Guided Lab](../lab-manual/19-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Test realistic error conditions before proceeding.
+
 **Level:** intermediate → advanced · **Estimated study:** 10–14 hours.
 
 ## Goal

@@ -1,5 +1,7 @@
 # Python for Cybersecurity — project ladder and capstones
 
+> **Implementation-first path:** [Progressive stages with runnable source code, fixtures, test commands and graduation criteria](BUILD-PATH.md).
+
 > **Detailed capstone engineering blueprint:** [Mini SOC requirements, schema, architecture, threat model, phase gates and evaluation rubric](../course/18-MINI-SOC-CAPSTONE-BLUEPRINT.md). For runnable starter code and tests, see [the offline mini SOC](../examples/mini_soc_pipeline.py) and [guided workshop](../workshops/02-MINI-SOC-DETECTION.md).
 
 Each project must be confined to owned test data, published with synthetic fixtures, and include tests, safe defaults, requirements, README, limitations and an operational threat model.

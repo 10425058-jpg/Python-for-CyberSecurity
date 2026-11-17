@@ -4,6 +4,15 @@
 
 > **Safety:** Operate only on systems, traffic and data you own or have explicit written permission to assess. The repository uses synthetic data and loopback-first examples. Tools are educational, not production-hardened scanners or forensic acquisition systems.
 
+## New: complete hands-on learning track
+
+- **[22 guided chapter labs](lab-manual/README.md):** one lab per Deep Dive chapter with runnable code, expected output, failure cases, explanation and grading.
+- **[100 worked exercise solutions](solutions/by-exercise/README.md):** full 001–100 numbering, code or technical model, assertions, and security analysis. The [original 100 prompts](reference/100-EXERCISES.md) now include concrete challenges and direct answer links.
+- **[Progressive project build path](projects/BUILD-PATH.md):** four tested offline Python tools (integrity inventory, IOC quality, incident timeline and detection evaluation) leading into the Mini-SOC capstone.
+- **Automated verification:** the curriculum checker covers 22 chapters, 22 labs and 100 solutions; safe standard-library lab and solution snippets are run in CI, with the optional cryptography examples clearly distinguished.
+
+**Start here:** read one [chapter](course/README.md), complete its linked lab, solve the matching exercise before checking the answer, then build a portfolio stage. All examples use synthetic or explicitly authorized data.
+
 ## Start with the **Deep Dive — Expanded Third Edition**
 
 The older `python/` and `security/` pages are **short topic overviews**. The expanded [**22-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.

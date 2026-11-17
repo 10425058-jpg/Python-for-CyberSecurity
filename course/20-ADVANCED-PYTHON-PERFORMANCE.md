@@ -1,5 +1,7 @@
 # Deep Dive 20 — Advanced Python internals, performance, generators and secure extensibility
 
+> **Hands-on:** [Chapter 20 Guided Lab](../lab-manual/20-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Test realistic error conditions before proceeding.
+
 **Level:** intermediate → advanced · **Estimated study:** 12–18 hours.
 
 ## Why this matters

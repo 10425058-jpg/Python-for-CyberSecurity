@@ -1,0 +1,2 @@
+{"provider":"lab-windows","event_id":"win-1","time":"2026-01-01T17:01:00+07:00","actor":"alex","event_code":1001}
+{"provider":"lab-windows","event_id":"win-2","time":"2026-01-01T17:02:00+07:00","actor":"sam","event_code":1002}

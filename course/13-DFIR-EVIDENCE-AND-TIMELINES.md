@@ -1,5 +1,7 @@
 # Deep Dive 13 — Digital forensics and incident response with Python
 
+> **Hands-on:** [Chapter 13 Guided Lab](../lab-manual/13-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Run negative tests and document limitations.
+
 **Level:** intermediate → advanced · **Estimated study:** 14–20 hours.
 
 ## Mission

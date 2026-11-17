@@ -1,5 +1,7 @@
 # Deep Dive 03 — Data structures, algorithmic complexity and scalable security pipelines
 
+> **Hands-on:** [Chapter 03 Guided Lab](../lab-manual/03-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** beginner → intermediate · **Estimated study:** 8–12 hours.
 
 ## The problem we will solve
@@ -214,9 +216,9 @@ def burst_crossings(events, *, window=60, threshold=3, max_actors=100):
         q = queues[actor]
         while q and t - q[0] > window:
             q.popleft()
+        q.append(t)
         if len(q) < threshold:
             active.discard(actor)
-        q.append(t)
         if len(q) >= threshold and actor not in active:
             active.add(actor)
             yield {"actor": actor, "time": t, "count": len(q)}
