@@ -1,6 +1,6 @@
 # Full curriculum index
 
-> **The detailed course has its own comprehensive index:** [19 deep-dive lessons with annotated code and worked exercises](../course/README.md). The chapters below are quick-reference companions, not the main long-form lessons.
+> **The detailed course has its own comprehensive index:** [22 deep-dive lessons with annotated code and worked exercises](../course/README.md). The chapters below are quick-reference companions, not the main long-form lessons.
 
 ## Part I — Programming foundations (12 chapters)
 | Chapter | Key competencies | Practice artifact |
@@ -44,6 +44,9 @@
 
 ## Learning objectives and assessment
 A **beginner** can explain syntax and write/tests a small program. An **intermediate practitioner** safely handles files, APIs, concurrency, security telemetry and failures. An **advanced practitioner** designs resource-bounded, observable, threat-modeled systems and evaluates detections with meaningful evidence. Real expertise requires professional feedback and experience in live operational contexts.
+
+## Worked answers
+- [12 fully solved representative exercises](../solutions/WORKED-SOLUTIONS.md) with code, tests and security rationale.
 
 ## Fully guided practical workshops
 - [Binary parser and negative tests](../workshops/01-BINARY-FRAMING.md)

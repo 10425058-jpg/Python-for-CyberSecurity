@@ -45,6 +45,13 @@ For every unit, be able to explain **what, why, how, failure modes and how to pr
 | II | [17 — Vulnerabilities and fuzzing](17-VULNERABILITIES-FUZZING-RISK.md) | CVE/CVSS risk, safe local parser fuzzing |
 | II | [18 — Mini SOC capstone](18-MINI-SOC-CAPSTONE-BLUEPRINT.md) | complete architecture, contracts, tests, review criteria |
 | II | [19 — Endpoint telemetry](19-ENDPOINT-OS-TELEMETRY.md) | Linux/Windows logs, source context, cross-platform normalization |
+| III | [20 — Advanced Python and performance](20-ADVANCED-PYTHON-PERFORMANCE.md) | import system, introspection, generators, profiling, caches, native boundaries |
+| III | [21 — Security statistics and ML](21-STATISTICS-ANOMALY-DETECTION-ML.md) | base rates, anomaly baselines, confusion matrix, leakage and drift |
+| III | [22 — Regex and untrusted text](22-REGEX-UNTRUSTED-TEXT.md) | fullmatch, Unicode, log grammars, ReDoS limits |
+
+## Worked solutions
+
+Study [12 fully worked answers](../solutions/WORKED-SOLUTIONS.md) for validated input, data structures, SQL, authorization, evidence hashing, AEAD, metrics and time-window detection. Each explains why the solution works and its limits.
 
 ## Fully guided workshops and checked code
 

@@ -32,7 +32,7 @@ python -m unittest tests.test_deep_examples.StrictFrameTests -v
 
 **Expected shape (hex value depends on JSON separators but is deterministic):**
 ```text
-hex: 5343010100287b...
+hex: 5343010100277b...
 decoded: {'version': 1, 'message_type': 1,
           'payload': {'source': 'local-lab', 'status': 'ok'}}
 ```

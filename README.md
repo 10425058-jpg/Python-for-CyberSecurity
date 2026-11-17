@@ -6,7 +6,7 @@
 
 ## Start with the **Second Edition: Deep Dive**
 
-The older `python/` and `security/` pages are **short topic overviews**. The new [**19-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.
+The older `python/` and `security/` pages are **short topic overviews**. The new [**22-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.
 
 **Recommended reading order:**
 
@@ -16,6 +16,9 @@ The older `python/` and `security/` pages are **short topic overviews**. The new
 4. [Networking, web/API security and cryptography](course/09-NETWORKING-DNS-TCP-TLS.md) — Units 09–11.
 5. [SOC, DFIR, PCAP and malware triage](course/12-SOC-DETECTION-ENGINEERING.md) — Units 12–15.
 6. [Cloud, vulnerabilities, endpoint telemetry and capstone](course/16-CLOUD-CONTAINERS-DEVSECOPS.md) — Units 16–19.
+7. [Advanced Python internals, anomaly detection and regex](course/20-ADVANCED-PYTHON-PERFORMANCE.md) — Units 20–22.
+
+**Full worked answer bank:** [12 complete solutions with reasoning and tests](solutions/WORKED-SOLUTIONS.md).
 
 **Guided, executable workshops:** [binary framing](workshops/01-BINARY-FRAMING.md), [offline mini SOC](workshops/02-MINI-SOC-DETECTION.md), [cryptography](workshops/03-CRYPTOGRAPHY-LAB.md), [incident timelines](workshops/04-INCIDENT-TIMELINE.md). Check [new standard-library examples](examples/strict_frame.py), [atomic mini SOC](examples/mini_soc_pipeline.py) and [their tests](tests/test_deep_examples.py).
 

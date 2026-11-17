@@ -40,3 +40,11 @@ Check only when you can explain, demonstrate and test the skill yourself.
 - [ ] Explain one design tradeoff and one false positive in an interview.
 - [ ] Review your work with another engineer or instructor.
 - [ ] Never include secrets, private logs or unauthorized targets.
+
+## Second edition advanced competencies
+- [ ] Explain Python imports, caches, bytecode limitations and memory profiling.
+- [ ] Measure detection quality with a labeled confusion matrix and account for base rates.
+- [ ] Distinguish anomalous behavior from confirmed malicious activity.
+- [ ] Use full-string regex validation and explain ReDoS risk under hostile input.
+- [ ] Complete the [12 worked-solution concepts](../solutions/WORKED-SOLUTIONS.md) without copying and pass self-written boundary tests.
+- [ ] Implement and test the [atomic mini SOC](../examples/mini_soc_pipeline.py) on synthetic events.
