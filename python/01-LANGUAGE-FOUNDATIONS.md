@@ -1,5 +1,5 @@
 # 01 — Python language foundations
-> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [python runtime and types](../course/01-PYTHON-RUNTIME-AND-TYPES.md) · [control flow functions errors](../course/02-CONTROL-FLOW-FUNCTIONS-ERRORS.md).
+> **Expanded textbook (Beginner → Advanced):** This chapter now includes a first-principles lesson, a runnable local program, a reasoning trace, failure cases and graduated exercises. For additional specialized lessons, see: [python runtime and types](../course/01-PYTHON-RUNTIME-AND-TYPES.md) · [control flow functions errors](../course/02-CONTROL-FLOW-FUNCTIONS-ERRORS.md).
 
 
 **Goal:** read and write small programs confidently without depending on an assistant.
