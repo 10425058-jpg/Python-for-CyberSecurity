@@ -38,6 +38,9 @@ def unique_keys(pairs):
         result[name] = value
     return result
 
+def reject_nonjson_constant(value):
+    raise ValueError(f"nonstandard JSON constant: {value}")
+
 def parse_frame(data: bytes) -> dict:
     if type(data) is not bytes or len(data) < HEADER.size:
         raise ValueError("missing complete header")
@@ -50,7 +53,7 @@ def parse_frame(data: bytes) -> dict:
         value = json.loads(
             data[HEADER.size:].decode("utf-8", "strict"),
             object_pairs_hook=unique_keys,
-            parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)),
+            parse_constant=reject_nonjson_constant,
         )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("invalid payload encoding") from exc

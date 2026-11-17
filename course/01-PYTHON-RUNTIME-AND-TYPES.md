@@ -64,7 +64,7 @@ for wrong in (float("nan"), float("inf"), -0.1, True):
         raise AssertionError("invalid confidence accepted")
 ```
 
-**Walk it through.** First predict the dictionary's length; then inspect the type of `True`. Notice that a range check such as `0 <= x <= 1` alone does not reject `nan` in the *expected* way: each comparison involving NaN is false, so a negated conjunction must be carefully interpreted. The explicit `math.isfinite` guard communicates the policy and rejects both NaN and infinities. Build validated domain objects **before** using input as keys, cache identities or rule parameters.
+**Walk it through.** First predict the dictionary's length; then inspect the type of `True`. Notice that NaN makes ordered comparisons false: a rejection rule `if x < 0 or x > 1` would **miss** NaN, while `if not (0 <= x <= 1)` would reject it. `math.isfinite` makes the rule's intent clear and rejects infinities too. The explicit `math.isfinite` guard communicates the policy and rejects both NaN and infinities. Build validated domain objects **before** using input as keys, cache identities or rule parameters.
 
 **Challenge without the answer first:** (1) What happens if a dict literal contains `0` and `False`? (2) Why is `if payload.get("limit")` not a presence check? (3) Should account identities be lowercased automatically? Write a counterexample for each. **Check:** `0` and `False` collide; an explicit zero is falsy; identity canonicalization depends on the authoritative provider.
 
