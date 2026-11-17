@@ -66,6 +66,18 @@ assert len(observed) == 1
 **Deep exercise:** Does using a timestamp alone prevent replay? Not reliably: clocks drift and messages may be re-sent inside a permitted tolerance. Compare a unique event ID plus durable dedup storage, a monotonic sequence, and a bounded timestamp window. State the operational costs and failure policy for each.
 
 
+**Causal comparison table:**
+
+| Input and state | HMAC valid? | Seen before? | Accepted as new event? |
+|---|---|---|---|
+| original signed message | yes | no | yes |
+| identical replay | yes | yes | no |
+| modified payload with original tag | no | no | no |
+| signed message for an unauthorized tenant | may be yes | no | **must still be denied** by separate authorization |
+
+The last row is outside the toy code's permission model; it explains why authentication of content does not grant resource access.
+
+
 ## 1. Hashing versus encryption
 
 A cryptographic hash such as SHA-256 maps arbitrary-length bytes to a fixed 256-bit digest. It cannot be decrypted. A hash can help detect file changes when compared against a trustworthy expected digest. Hashes are not proof of authorship, and unsalted fast hashes are not suitable for password storage.

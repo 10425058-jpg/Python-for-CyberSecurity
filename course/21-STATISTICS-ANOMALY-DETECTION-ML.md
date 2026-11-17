@@ -61,6 +61,18 @@ assert max(map(event_time, random_style_train)) < min(
 **Independent assignment:** create two different evaluation splits on ten synthetic users over three weeks. Compute identity overlap and temporal overlap, then describe what each split can legitimately claim. Explain why "the model achieved 99% accuracy" is not enough to recommend autonomous account-locking.
 
 
+**Compare splits against the target question:**
+
+| Split policy | Prevents future-to-past leakage? | Prevents same-identity overlap? | Suitable claim |
+|---|---|---|---|
+| random event rows | not guaranteed | no | limited in-sample generalization |
+| chronological cutoff | yes if features respect time | not necessarily | forecast known populations |
+| entity-grouped | not guaranteed | yes | new identity generalization |
+| grouped **and** chronological | by design | by design | stronger test for unseen future entities, with less data |
+
+Even the fourth option needs feature and label audits; a split alone cannot repair biased ground truth.
+
+
 ## 1. Base rates are decisive
 
 Suppose only 1 in 1,000 authentication sessions are truly malicious. A detector with 90% recall and a 5% false-positive rate sounds good, but among 1,000 sessions:

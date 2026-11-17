@@ -61,6 +61,18 @@ else:
 **Challenge:** estimate how the memory changes when event count stays at 10,000 but unique actors increase from 2 to 10,000. Explain which stage must reject/evict/spill data; report the cost of that decision for detection accuracy. Then compare a full-list approach with the bounded streaming approach using repeated measurements and realistic sanitized fixtures.
 
 
+**Complexity comparison to predict before running:**
+
+| Total events (N) | Unique actors (U) | Counter memory trend | Main risk |
+|---:|---:|---|---|
+| 10,000 | 2 | O(2) keys | low cardinality |
+| 10,000 | 100 | O(100) keys | reaches toy limit |
+| 10,000 | 10,000 | would be O(10,000) keys | reject or move to bounded state |
+| 1,000,000 | 2 | still O(2) keys | ingestion CPU/I/O remains O(N) |
+
+**Observe:** the cap makes the third scenario fail visibly; it does not mean the source data disappeared safely or that a usable complete report was produced.
+
+
 ## 1. Python's execution model and import system
 
 When Python imports a module, its top-level code executes (unless cached after initial import). The import system searches paths including the working directory and configured environment. A local `json.py` or `logging.py` can shadow standard-library modules; a malicious package named similarly to a legitimate dependency can be loaded if installation sources are compromised.

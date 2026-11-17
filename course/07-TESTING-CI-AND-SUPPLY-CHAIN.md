@@ -56,6 +56,9 @@ assert result.wasSuccessful() and result.testsRun == 5
 **Practice:** Write a threat-based test plan for a CI pipeline that installs dependencies and tests code from outside contributors. Explain why minimizing workflow token permissions, isolating untrusted jobs and avoiding production secrets are as important as the application's unit tests.
 
 
+**Independent exercise (do not copy the answer):** add an authorization rule requiring a matching tenant and a specific read permission. Write a correct implementation and a deliberately broken mutant that omits the tenant check. Build one assertion that would fail for the mutant, then explain why testing only a same-tenant success cannot find a cross-tenant access bug.
+
+
 ## 1. A security tool needs evidence of correctness
 
 "Runs without throwing" is not a meaningful quality guarantee. A defensive detector may silently miss incidents, misread time zones or turn one malformed event into hundreds of false alerts. We need tests for properties and failure modes, not merely for output formatting.
