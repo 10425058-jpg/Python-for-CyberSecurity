@@ -1,6 +1,6 @@
-# Python for Cybersecurity — Deep Dive, Second Edition
+# Python for Cybersecurity — Deep Dive (Expanded Third Edition)
 
-**This is the detailed, explanation-first track.** The short pages in `python/` and `security/` are retained as **quick-reference overviews**. The units here contain the deeper conceptual lessons, explanatory traces, annotated Python, security failure modes, worked checks and end-of-unit assignments. Every active exercise is offline or loopback-only, using authorized/synthetic data.
+**All 22 chapters have been expanded with additional executable case studies, trace tables, failure-mode discussion, exercises and solution cues.** This is the detailed, explanation-first track. The short pages in `python/` and `security/` are retained as **quick-reference overviews**. The units here contain the deeper conceptual lessons, explanatory traces, annotated Python, security failure modes, worked checks and end-of-unit assignments. Every active exercise is offline or loopback-only, using authorized/synthetic data.
 
 ## How to learn efficiently
 
@@ -48,6 +48,18 @@ For every unit, be able to explain **what, why, how, failure modes and how to pr
 | III | [20 — Advanced Python and performance](20-ADVANCED-PYTHON-PERFORMANCE.md) | import system, introspection, generators, profiling, caches, native boundaries |
 | III | [21 — Security statistics and ML](21-STATISTICS-ANOMALY-DETECTION-ML.md) | base rates, anomaly baselines, confusion matrix, leakage and drift |
 | III | [22 — Regex and untrusted text](22-REGEX-UNTRUSTED-TEXT.md) | fullmatch, Unicode, log grammars, ReDoS limits |
+
+## Verified chapter examples
+
+The [shared standard-library demonstration module](../examples/chapter_cases.py) implements strict JSON policy validation, timezone-aware toy log parsing, a tenant-scoped authorization rule, detection precision/recall and a transactional SQLite importer. Its [regression tests](../tests/test_chapter_cases.py) exercise malformed input, cross-tenant denial, false-positive metrics and all-or-nothing imports. Run:
+
+```bash
+python -m examples.chapter_cases
+python -m unittest tests.test_chapter_cases -v
+python tools/verify_curriculum.py
+```
+
+**Chapter learning standard:** read the original explanation, then the newly expanded numbered sections toward the end of each chapter. For every code example, predict normal and malformed outcomes, run it, and write an independent test. Python snippets in these chapters are syntax-checked in CI; this is not a claim that every snippet has been functionally proven.
 
 ## Worked solutions
 

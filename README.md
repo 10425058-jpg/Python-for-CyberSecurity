@@ -4,9 +4,9 @@
 
 > **Safety:** Operate only on systems, traffic and data you own or have explicit written permission to assess. The repository uses synthetic data and loopback-first examples. Tools are educational, not production-hardened scanners or forensic acquisition systems.
 
-## Start with the **Second Edition: Deep Dive**
+## Start with the **Deep Dive — Expanded Third Edition**
 
-The older `python/` and `security/` pages are **short topic overviews**. The new [**22-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.
+The older `python/` and `security/` pages are **short topic overviews**. The expanded [**22-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.
 
 **Recommended reading order:**
 
@@ -17,6 +17,8 @@ The older `python/` and `security/` pages are **short topic overviews**. The new
 5. [SOC, DFIR, PCAP and malware triage](course/12-SOC-DETECTION-ENGINEERING.md) — Units 12–15.
 6. [Cloud, vulnerabilities, endpoint telemetry and capstone](course/16-CLOUD-CONTAINERS-DEVSECOPS.md) — Units 16–19.
 7. [Advanced Python internals, anomaly detection and regex](course/20-ADVANCED-PYTHON-PERFORMANCE.md) — Units 20–22.
+
+**New tested examples:** [strict policy validation, tenant authorization, timezone-aware logs, detection metrics and SQLite transactions](examples/chapter_cases.py), with [regression tests](tests/test_chapter_cases.py). Every Deep Dive chapter now includes a further detailed case study and exercise set.
 
 **Full worked answer bank:** [12 complete solutions with reasoning and tests](solutions/WORKED-SOLUTIONS.md).
 
@@ -49,6 +51,8 @@ python -m venv .venv
 python -m unittest discover -s tests -v
 python -m examples.mini_soc_pipeline --input fixtures/synthetic-auth.jsonl --output findings.jsonl
 python -m examples.strict_frame
+python -m examples.chapter_cases
+python tools/verify_curriculum.py
 python -m examples.log_detector fixtures/synthetic-auth.jsonl
 python -m examples.file_manifest fixtures
 python -m examples.indicator_normalizer fixtures/synthetic-indicators.jsonl
@@ -56,7 +60,7 @@ python -m examples.local_port_check 8080
 ```
 
 ## What this resource does and does not claim
-This repository now contains a **detailed second-edition core** plus short overviews. Although substantially expanded, it still cannot exhaustively cover every changing Python library, protocol, OS, cybersecurity specialty or attack technique. Advanced production work requires current vendor docs, lab practice, peer review and supervised experience. The exercises are defensive and local-first; example tools are not forensic-grade or production hardened.
+This repository now contains a **third-edition expansion of 22 in-depth lessons** plus short overviews. Although substantially expanded, it still cannot exhaustively cover every changing Python library, protocol, OS, cybersecurity specialty or attack technique. Advanced production work requires current vendor docs, lab practice, peer review and supervised experience. The exercises are defensive and local-first; example tools are not forensic-grade or production hardened.
 
 ## Other learning materials
 This repository is exclusively dedicated to Python for Cybersecurity. General cybersecurity material lives separately at [CyberSecurity-](https://github.com/10425058-jpg/CyberSecurity-).

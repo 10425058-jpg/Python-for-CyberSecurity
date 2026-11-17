@@ -2,6 +2,11 @@
 
 All examples use synthetic/local data. Most require only the Python standard library. `offline_pcap.py` optionally needs Scapy and works on **offline** user-supplied PCAP files. A reachable TCP port does not imply a vulnerability; entropy does not imply malware; log alerts require human review.
 
+## Expanded-chapter runnable examples
+
+- [Chapter case studies](chapter_cases.py): strict byte-bound JSON policy validator, toy log regex/time normalization, tenant-specific authorization, confusion-matrix metrics and atomic SQLite batch semantics.
+- [Offline regression tests](../tests/test_chapter_cases.py) cover field types, duplicate keys, invalid timestamps, cross-tenant denial, zero denominators, duplicate event IDs and transaction rollback.
+
 ## Deep-dive, end-to-end examples
 
 - [Strict toy binary frame parser](strict_frame.py): validates magic/version/type/length, strict UTF-8 JSON, duplicate keys, malformed input and payload caps. Guided [Workshop 01](../workshops/01-BINARY-FRAMING.md).
@@ -11,6 +16,7 @@ All examples use synthetic/local data. Most require only the Python standard lib
 ## Commands
 ```bash
 python -m examples.strict_frame
+python -m examples.chapter_cases
 python -m examples.mini_soc_pipeline --input fixtures/synthetic-auth.jsonl --output findings.jsonl
 python -m examples.file_manifest fixtures
 python -m examples.log_detector fixtures/synthetic-auth.jsonl --threshold 3

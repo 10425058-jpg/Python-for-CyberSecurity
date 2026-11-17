@@ -280,7 +280,7 @@ An alert should include:
 - Time uncertainty, confidence and threshold policy.
 - Suggested **verification steps** before any containment.
 
-Never automatically disable accounts based on a weak, uncorroborated rule. It could be weaponized to cause denial of service against legitimate users. OWASP emphasizes monitoring authentication failures while evaluating context and false positives. <Link omitted: cite authoritative [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).>
+Never automatically disable accounts based on a weak, uncorroborated rule. It could be weaponized to cause denial of service against legitimate users. OWASP emphasizes monitoring authentication failures while evaluating context and false positives. Refer to the [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
 
 ### Exercises
 1. Add an explicit duplicate-ID policy to a toy source and test two duplicates.
