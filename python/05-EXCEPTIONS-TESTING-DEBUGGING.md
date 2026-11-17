@@ -1,5 +1,5 @@
 # 05 — Error handling, tests, debugging and observability
-> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [testing ci and supply chain](../course/07-TESTING-CI-AND-SUPPLY-CHAIN.md).
+> **Expanded textbook (Beginner → Advanced):** This chapter now includes a first-principles lesson, a runnable local program, a reasoning trace, failure cases and graduated exercises. For additional specialized lessons, see: [testing ci and supply chain](../course/07-TESTING-CI-AND-SUPPLY-CHAIN.md).
 
 
 

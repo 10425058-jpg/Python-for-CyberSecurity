@@ -1,5 +1,5 @@
 # 07 — Iterators, generators, context managers and decorators
-> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [collections complexity streams](../course/03-COLLECTIONS-COMPLEXITY-STREAMS.md) · [concurrency async os automation](../course/08-CONCURRENCY-ASYNC-OS-AUTOMATION.md).
+> **Expanded textbook (Beginner → Advanced):** This chapter now includes a first-principles lesson, a runnable local program, a reasoning trace, failure cases and graduated exercises. For additional specialized lessons, see: [collections complexity streams](../course/03-COLLECTIONS-COMPLEXITY-STREAMS.md) · [concurrency async os automation](../course/08-CONCURRENCY-ASYNC-OS-AUTOMATION.md).
 
 
 

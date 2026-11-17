@@ -1,5 +1,5 @@
 # 04 — Files, binary data, parsing and evidence hygiene
-> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [bytes encoding binary parsers](../course/04-BYTES-ENCODING-BINARY-PARSERS.md) · [files json sql trust boundaries](../course/05-FILES-JSON-SQL-TRUST-BOUNDARIES.md).
+> **Expanded textbook (Beginner → Advanced):** This chapter now includes a first-principles lesson, a runnable local program, a reasoning trace, failure cases and graduated exercises. For additional specialized lessons, see: [bytes encoding binary parsers](../course/04-BYTES-ENCODING-BINARY-PARSERS.md) · [files json sql trust boundaries](../course/05-FILES-JSON-SQL-TRUST-BOUNDARIES.md).
 
 
 > **More detail:** [Regex, Unicode and hostile log-text parsing](../course/22-REGEX-UNTRUSTED-TEXT.md).

@@ -1,5 +1,5 @@
 # 06 — Object-oriented design and maintainable security tools
-> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [typing oop architecture](../course/06-TYPING-OOP-ARCHITECTURE.md).
+> **Expanded textbook (Beginner → Advanced):** This chapter now includes a first-principles lesson, a runnable local program, a reasoning trace, failure cases and graduated exercises. For additional specialized lessons, see: [typing oop architecture](../course/06-TYPING-OOP-ARCHITECTURE.md).
 
 
 
