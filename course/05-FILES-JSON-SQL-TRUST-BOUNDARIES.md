@@ -7,6 +7,72 @@
 ## Scenario
 A security operations team exports several JSONL files every morning. Each file includes authentication events, but records may be duplicated, corrupted, truncated or timestamped in different zones. You need to build an ingest process that preserves meaning, provides error evidence and does not run unsafe operations.
 
+## Masterclass — a database transaction is a completeness guarantee, not a parser
+
+**The failure to prevent:** the first two JSONL records are valid, the third is malformed, but the importer has already committed records 1 and 2. If a later system queries the table without a visible ingestion status, it may treat an incomplete snapshot as complete. A database transaction can prevent that *within one database*, provided parsing and inserts participate in the same transaction.
+
+**Precise vocabulary:** `parse` transforms syntax into objects, `validate` enforces a trusted schema, `normalize` produces a canonical representation, `commit` makes a consistent batch visible, `close` releases a connection. A SQLite connection's context manager commits/rolls back but **does not close** the connection.
+
+| Condition | DB behavior | Operator-visible outcome |
+|---|---|---|
+| all three events valid | commit 3 rows | complete |
+| record 3 malformed | roll back all 3 inserts | incomplete |
+| duplicate event ID | integrity failure and rollback | incomplete |
+| SQLite connection error | propagate and roll back if possible | incomplete |
+
+**Runnable experiment with an in-memory database:**
+
+```python
+# MASTERCLASS_RUNNABLE
+import json
+import sqlite3
+from contextlib import closing
+
+def import_batch(connection: sqlite3.Connection, lines: list[str]) -> int:
+    if type(lines) is not list or len(lines) > 100:
+        raise ValueError("batch size")
+    # Schema creation belongs outside the import transaction.
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, actor TEXT)"
+    )
+    connection.commit()
+    added = 0
+    with connection:
+        for index, raw in enumerate(lines, 1):
+            if type(raw) is not str or len(raw.encode("utf-8")) > 1024:
+                raise ValueError(f"line {index}: invalid size")
+            obj = json.loads(raw)
+            if type(obj) is not dict or set(obj) != {"id", "actor"}:
+                raise ValueError(f"line {index}: invalid schema")
+            if any(type(obj[key]) is not str or not obj[key] for key in obj):
+                raise ValueError(f"line {index}: invalid fields")
+            connection.execute(
+                "INSERT INTO events(id, actor) VALUES (?, ?)",
+                (obj["id"], obj["actor"]),
+            )
+            added += 1
+    return added
+
+with closing(sqlite3.connect(":memory:")) as db:
+    good = ['{"id":"a","actor":"alex"}', '{"id":"b","actor":"sam"}']
+    try:
+        import_batch(db, good + ["{corrupt"])
+    except json.JSONDecodeError:
+        pass
+    else:
+        raise AssertionError("malformed record silently accepted")
+    assert db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+    assert import_batch(db, good) == 2
+    assert db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 2
+```
+
+**Trace:** Each insert happens inside `with connection`. If parsing row 3 raises, the context manager rolls back rows 1 and 2. The second call inserts both rows successfully and commits. The parameterized SQL placeholders ensure that a string resembling SQL syntax remains data; they do not authorize the caller or authenticate the log source.
+
+**What to improve for an actual security ingestion service:** (1) strict duplicate-key JSON parser, (2) raw-byte limits before decoding, (3) source-qualified IDs, (4) UTC and source-provenance fields, (5) record-level reporting and a durable batch-completion receipt, (6) explicit rollback on filesystem/DB exceptions, and (7) separation of telemetry access from analytics access.
+
+**Independent task:** Insert an identical event twice in one batch and predict the `sqlite3.IntegrityError`. Does the table become half-filled? Write the test. Then use a value containing an apostrophe and explain why bound parameters, not string escaping, are the right SQL defense.
+
+
 ## 1. Treat external data as hostile until validated
 
 A trust boundary exists whenever data crosses from an uncontrolled source into logic you rely on: disk → parser; API → JSON model; user input → SQL; database → HTML; log record → shell invocation. A familiar file extension does **not** make content safe. Applying a parser is not validation.

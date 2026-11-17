@@ -8,6 +8,68 @@
 
 A 50-line script can be easy to inspect. A 5,000-line security tool needs understandable contracts so that a failed parser cannot unexpectedly mutate a database and a compromised enrichment API cannot trigger high-impact actions. Your design should make **trust boundaries and side effects visible**.
 
+## Masterclass — type annotations cannot enforce a trust boundary
+
+A structural `Protocol` is a contract that static checkers can use, not a runtime firewall. A `dataclass` field annotated `actor: str` can still be created with an integer unless your code validates it. A defense-oriented architecture therefore separates **untrusted raw input → validated domain object → pure policy → side-effect adapter**.
+
+**Architecture exercise:** a report-reading service must never let a client-supplied `tenant` decide what the user may read. The principal comes from an authenticated server session; the report owner/tenant comes from authoritative storage.
+
+**Runnable hexagonal-architecture demonstration:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+from typing import Protocol
+
+@dataclass(frozen=True)
+class Principal:
+    subject: str
+    tenant: str
+    rights: frozenset[str]
+
+@dataclass(frozen=True)
+class Report:
+    report_id: str
+    tenant: str
+    owner: str
+
+def authorize_view(principal: Principal, report: Report) -> bool:
+    return (principal.tenant == report.tenant
+            and principal.subject == report.owner
+            and "report:view-own" in principal.rights)
+
+class ReportPort(Protocol):
+    def fetch(self, report_id: str) -> Report | None: ...
+
+class FakeReports:
+    def __init__(self, records: dict[str, Report]):
+        self.records = records
+    def fetch(self, report_id: str) -> Report | None:
+        return self.records.get(report_id)
+
+def lookup_allowed(
+    store: ReportPort, principal: Principal, report_id: str
+) -> Report | None:
+    if type(report_id) is not str or not 1 <= len(report_id) <= 64:
+        raise ValueError("bad report id")
+    found = store.fetch(report_id)
+    return found if found is not None and authorize_view(principal, found) else None
+
+repo = FakeReports({"r1": Report("r1", "tenant-A", "alex")})
+alex = Principal("alex", "tenant-A", frozenset({"report:view-own"}))
+mallory = Principal("mallory", "tenant-B", frozenset({"report:view-own"}))
+assert lookup_allowed(repo, alex, "r1") is not None
+assert lookup_allowed(repo, mallory, "r1") is None
+assert lookup_allowed(repo, alex, "missing") is None
+```
+
+**Separate the four responsibilities.** `ReportPort` documents what the adapter must implement. `FakeReports` permits deterministic unit tests. `authorize_view` is a pure decision function. `lookup_allowed` validates the lookup key, fetches authoritative metadata, and applies the policy before returning a report. No real database or network is needed to test this example.
+
+**Important limitation:** the example *assumes* `Principal` is authenticated and the returned `Report` is trustworthy. The type hints and `frozen=True` do not prove either. In a real app, construct the principal only from validated server identity, enforce tenant constraints in the query, audit denials carefully, and serialize only permitted fields. Avoid object leaks through error messages.
+
+**Design challenge:** (1) Make the fake repository raise an `OSError` on fetch; should the service allow the report? (No.) (2) Add a tenant auditor role without granting access to private personal reports. (3) Demonstrate that an invalid `Principal(123, [], frozenset())` is not automatically rejected at runtime. Which boundary validator must reject it?
+
+
 ## 1. Types: static guidance versus runtime enforcement
 
 `list[str]`, `dict[str, int]`, `Literal`, `Protocol`, `TypedDict`, `Callable` and generics improve communication and editor tooling. Type annotations are *not* runtime validators. When untrusted data enters the system, validate explicitly.
