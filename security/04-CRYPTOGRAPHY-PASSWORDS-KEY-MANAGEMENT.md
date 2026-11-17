@@ -1,4 +1,6 @@
 # Cryptography with Python: correct primitives and use cases
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [cryptography deep dive](../course/11-CRYPTOGRAPHY-DEEP-DIVE.md).
+
 
 ## What cryptography solves
 - **Hash function:** maps bytes to a fixed-size digest; integrity comparison, not encryption.

@@ -1,4 +1,6 @@
 # Web applications, APIs and secure Python backend patterns
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [web api authorization security](../course/10-WEB-API-AUTHORIZATION-SECURITY.md).
+
 
 ## HTTP fundamentals
 Methods (GET/POST/PUT/PATCH/DELETE), status codes, URL components, headers, cookies, JSON, content types, caching, redirects, CORS, TLS, proxies and reverse proxies. CORS is a **browser enforcement mechanism**, not API authentication. Distinguish authentication from authorization and resource ownership checks.

@@ -1,4 +1,6 @@
 # Identity, access management and session security
+> **Deep explanation:** This page is a topic overview. For mechanisms, annotated code, limits, worked case studies, questions and answer checks, follow [web api authorization security](../course/10-WEB-API-AUTHORIZATION-SECURITY.md).
+
 
 ## Core distinctions
 - Identification: claimed identity.
