@@ -1,0 +1,2 @@
+{"provider":"lab-linux","event_id":"lin-1","time":"2026-01-01T10:00:00Z","actor":"alex","kind":"failure"}
+{"provider":"lab-linux","event_id":"lin-2","time":"2026-01-01T10:03:00Z","actor":"alex","kind":"success"}
