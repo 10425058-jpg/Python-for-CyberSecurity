@@ -8,6 +8,59 @@
 
 Large Python security programs ingest hostile data, run for weeks, connect to services, cache identities, process many events and import third-party code. Understanding Python's execution details helps you find subtle logic and resource failures that basic syntax lessons miss.
 
+## Masterclass — profiling the complete pipeline rather than a convenient slice
+
+A security data pipeline can look memory-efficient because it iterates over a generator, yet still keep an ever-growing dictionary of every distinct username. It can also look fast if a benchmark starts *after* loading the file. **Measure the entire workload**, including parsing, input construction and output storage, and identify the data dimension that controls memory.
+
+**Compare two scales:**
+- \(N\): total event count.
+- \(U\): distinct actor identities.
+
+A streaming Counter processes events in roughly O(N) time but retains O(U) actor keys. If attacker-controlled input generates a million unique actors, a "streaming" implementation may still exhaust RAM.
+
+**Runnable controlled allocation comparison:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from collections import Counter
+from time import perf_counter
+import tracemalloc
+
+def analyze(events):
+    counts = Counter()
+    for actor in events:
+        if type(actor) is not str or not 1 <= len(actor) <= 32:
+            raise ValueError("actor type/size")
+        if actor not in counts and len(counts) >= 100:
+            raise ValueError("actor cardinality cap")
+        counts[actor] += 1
+    return counts
+
+tracemalloc.start()  # begin before constructing input
+start = perf_counter()
+inputs = ("alex" if i % 2 else "sam" for i in range(10_000))
+counts = analyze(inputs)
+elapsed = perf_counter() - start
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+
+assert counts == {"alex": 5000, "sam": 5000}
+assert elapsed >= 0 and peak >= current
+try:
+    analyze(f"actor-{i}" for i in range(101))
+except ValueError:
+    pass
+else:
+    raise AssertionError("unbounded actor count accepted")
+```
+
+**Read the measurements:** this program uses a generator, so there is no stored 10,000-element input list. The counter holds two keys. The `tracemalloc` peak is for Python-tracked allocations while tracing is enabled; it does **not** equal total OS RSS or all native allocations. Times and byte values vary across machines; never assert an exact benchmark duration.
+
+**Another performance trap:** caching authorization decisions without tenant, principal, permission version or invalidation can return sensitive data under a stale context. A cache must respect the data's semantics, not merely accelerate repeated calls. A bounded `lru_cache` controls entry count but not necessarily secrecy, authorization or size of objects stored.
+
+**Challenge:** estimate how the memory changes when event count stays at 10,000 but unique actors increase from 2 to 10,000. Explain which stage must reject/evict/spill data; report the cost of that decision for detection accuracy. Then compare a full-list approach with the bounded streaming approach using repeated measurements and realistic sanitized fixtures.
+
+
 ## 1. Python's execution model and import system
 
 When Python imports a module, its top-level code executes (unless cached after initial import). The import system searches paths including the working directory and configured environment. A local `json.py` or `logging.py` can shadow standard-library modules; a malicious package named similarly to a legitimate dependency can be loaded if installation sources are compromised.

@@ -4,6 +4,67 @@
 
 **Level:** intermediate → advanced · **Estimated study:** 12–16 hours.
 
+## Masterclass — severity is not a complete vulnerability decision
+
+A vulnerability alert begins with an advisory and a software component. A **risk-based remediation decision** also needs the actual deployed version, applicability, exposure and business context. A high CVSS score does not tell you whether your asset contains the affected component, whether the vulnerable code is reachable, or whether compensating controls change operational priority.
+
+**Separate these questions:**
+1. **Identity:** is this exact component/version deployed?
+2. **Applicability:** does the advisory's affected-range logic apply?
+3. **Exposure:** can the vulnerable behavior be reached in this environment?
+4. **Impact:** what data, service and privilege are at risk?
+5. **Response:** is there a tested fix, mitigation or exception, and who approves it?
+
+| Applicable? | Exposed? | Fix exists? | Honest next step |
+|---|---|---|---|
+| no | unknown | any | document non-applicability with version evidence |
+| yes | yes | yes | prioritize approved patch/retest |
+| yes | yes | no | review mitigation/exception and monitor |
+| yes | **unknown** | any | investigate exposure before declaring safe |
+| **unknown** | any | any | validate product/version/advisory first |
+
+**Executable triage model (toy records, no vulnerability scanning):**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Finding:
+    component: str
+    affected: bool | None
+    exposed: bool | None
+    fix_available: bool
+
+def decide(f: Finding) -> str:
+    if not f.component:
+        raise ValueError("component required")
+    if f.affected is None:
+        return "VERIFY_APPLICABILITY"
+    if f.affected is False:
+        return "DOCUMENT_NOT_AFFECTED"
+    if f.exposed is None:
+        return "VERIFY_EXPOSURE"
+    if f.exposed and f.fix_available:
+        return "PLAN_APPROVED_PATCH"
+    if f.exposed:
+        return "INVESTIGATE_MITIGATION"
+    return "VALIDATE_CONTROLS_AND_SCHEDULE"
+
+assert decide(Finding("toy", None, None, True)) == "VERIFY_APPLICABILITY"
+assert decide(Finding("toy", True, None, True)) == "VERIFY_EXPOSURE"
+assert decide(Finding("toy", True, True, True)) == "PLAN_APPROVED_PATCH"
+assert decide(Finding("toy", True, True, False)) == "INVESTIGATE_MITIGATION"
+assert decide(Finding("toy", False, None, False)) == "DOCUMENT_NOT_AFFECTED"
+```
+
+**Reasoning:** the nullable fields preserve *unknown* as a distinct status. A vulnerable package being listed in a dependency file does not establish that it is shipped to a production deployment; a scanner finding does not establish exploitability. Conversely, lack of public exploit details does not prove a risk is absent.
+
+**Implementation edge case:** Python package versions follow rules such as PEP 440; string comparison is not correct for determining whether `1.10` is newer than `1.2`. Use a maintained semantic version implementation appropriate to the ecosystem, verify advisory ranges and check actually deployed artifacts. Consider reachability, asset criticality and evidence of exploitation without treating a single scoring system as infallible.
+
+**Exercise:** create three synthetic advisories with identical severity but different deployment context: (A) not deployed, (B) reachable service and fix available, (C) unclear effective exposure. Write three remediation tickets showing distinct priorities and what information is missing. A responsible program uses owner approval, staged rollout, rollback and verification rather than indiscriminate automatic upgrades.
+
+
 ## 1. Severity is not the same as organizational risk
 
 A vulnerability may have a high CVSS score but be unreachable in your deployment. Another issue may have a lower score yet affect an Internet-facing critical system. Prioritization should consider:
