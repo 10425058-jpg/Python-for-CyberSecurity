@@ -300,6 +300,199 @@ print("D01-E: shallow copies preserve inner aliases")
 **Study checkpoint:** Describe one situation where comprehensions improve readability and another where a plain loop with explicit error handling is safer.
 
 
+
+## 1.13 Deep Core VI — Scope, arguments, closures and safe defaults
+
+Python's name lookup normally follows **LEGB**: Local, Enclosing, Global, Builtins. Defining a function creates a function object; calling it creates a new local namespace. Arguments are passed as references to objects (sometimes described as *call by sharing*). When a function mutates a list argument, callers observing that list see the mutation; rebinding the local parameter name alone does not change the caller's binding.
+
+Default arguments are evaluated **once when the `def` statement executes**, not on each call. That is why `def record(item, history=[]): ...` can share one list across invocations. A closure may retain access to an enclosing variable; a loop-created lambda often captures the *same binding* and observes its final value later.
+
+```python
+# DEEP_CORE_RUNNABLE
+def unsafe_default(value, bucket=[]):
+    bucket.append(value)
+    return bucket
+
+assert unsafe_default("a") == ["a"]
+assert unsafe_default("b") == ["a", "b"]  # demonstrate the trap, not a pattern to copy
+
+def safe_default(value, bucket=None):
+    if bucket is None:
+        bucket = []
+    bucket.append(value)
+    return bucket
+
+assert safe_default("a") == ["a"]
+assert safe_default("b") == ["b"]
+
+late = [lambda: i for i in range(3)]
+fixed = [lambda i=i: i for i in range(3)]
+assert [fn() for fn in late] == [2, 2, 2]
+assert [fn() for fn in fixed] == [0, 1, 2]
+
+def append_one(items: list[int]) -> None:
+    items.append(1)
+data: list[int] = []
+assert append_one(data) is None
+assert data == [1]
+print("D01-F: defaults, closures, and mutation")
+```
+
+| Mechanism | Object changed? | Binding changed? | Lesson |
+|---|---|---|---|
+| `a.append(x)` | usually yes (list) | no | caller sees mutation |
+| `a = a + [x]` | creates new list | yes, local | caller keeps original |
+| `return a` | none by itself | caller decides | make data flow explicit |
+| default `bucket=[]` | one list persists | same default object | avoid accidental shared state |
+| closure capturing `i` | sees enclosing binding | variable can change | bind values explicitly when needed |
+
+**Scope exercise:** Write a closure-based counter with `nonlocal`. Then rewrite it as a small class. Which version has clearer state ownership and is easier to reset for unit tests? Avoid mutable global state in a detector that needs reproducible evaluation.
+
+## 1.14 Deep Core VII — Decisions with `if`, `match`, loops and exception paths
+
+Use `if/elif/else` for Boolean conditions, and `match/case` (Python 3.10+) when matching structures or variants. A match pattern binds names and may match even when fields are the wrong semantic type; it does **not** replace schema validation. Bare variable names in `case` patterns can be **capture patterns**, not equality comparisons to existing variables. Literal and qualified constant patterns have different behavior.
+
+A loop may have an `else` block that runs when iteration completes without `break`. This is useful for "search completed without finding a match" but easy to misunderstand. `continue` starts the next iteration and `break` exits the loop only; neither exits the containing function.
+
+```python
+# DEEP_CORE_RUNNABLE
+def normalized_action(raw: object) -> str:
+    match raw:
+        case {"action": "login_failure", "actor": actor} if type(actor) is str and actor:
+            return "failure"
+        case {"action": "login_success", "actor": actor} if type(actor) is str and actor:
+            return "success"
+        case _:
+            raise ValueError("unsupported event shape or fields")
+
+assert normalized_action({"action": "login_failure", "actor": "alex"}) == "failure"
+assert normalized_action({"action": "login_success", "actor": "sam"}) == "success"
+for bad in ({"action": "login_failure", "actor": None}, {"action": "other"}):
+    try:
+        normalized_action(bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid event matched")
+
+def first_seen(values: list[str], target: str) -> int | None:
+    for index, value in enumerate(values):
+        if value == target:
+            return index
+    else:                          # loop exhausted, no break
+        return None
+
+assert first_seen(["a", "b"], "b") == 1
+assert first_seen(["a", "b"], "missing") is None
+print("D01-G: matching is not full schema validation")
+```
+
+**Important limitation:** mapping patterns accept dictionaries with additional keys; the sample does not enforce an exact schema or prohibit subclasses. If a real API requires exactly `actor` and `action`, validate key sets separately (as demonstrated earlier in this chapter). Always test one missing field, one extra field, one wrong type, and one unknown enum value.
+
+## 1.15 Deep Core VIII — Iteration tools and data-shape assumptions
+
+`range(start, stop, step)` defines a lazy arithmetic sequence with an exclusive stop. `enumerate(iterable, start=...)` pairs each value with an index; this is a useful way to report input line numbers. `zip` combines streams until the shortest ends by default, which can silently drop unmatched records. Python 3.10+ supports `zip(..., strict=True)` to raise `ValueError` when lengths differ. `sorted` creates a sorted list and leaves the input alone; `list.sort` mutates the original list in place. Python's sort is stable, which helps preserve source order for tied timestamps.
+
+```python
+# DEEP_CORE_RUNNABLE
+sources = ["idp-A", "idp-B"]
+ids = ["e1", "e2"]
+pairs = list(zip(sources, ids, strict=True))
+assert pairs == [("idp-A", "e1"), ("idp-B", "e2")]
+assert list(enumerate(["ok", "failed"], start=1)) == [(1, "ok"), (2, "failed")]
+assert list(range(2, 8, 2)) == [2, 4, 6]
+try:
+    list(zip(sources, ["e1"], strict=True))
+except ValueError:
+    pass
+else:
+    raise AssertionError("mismatched input lengths silently truncated")
+
+events = [(10, "a"), (9, "b"), (10, "c")]
+assert sorted(events, key=lambda item: item[0]) == [(9, "b"), (10, "a"), (10, "c")]
+assert events[0] == (10, "a")  # original order unchanged
+print("D01-H: strict zip and stable sorting")
+```
+
+**Security connection:** if one file contains source names and another contains corresponding event IDs, ordinary `zip` can silently drop trailing IDs. A parser should reject length mismatches or document the policy, rather than quietly producing an incomplete-but-successful report.
+
+## 1.16 Deep Core IX — String formatting, representations and safely displaying data
+
+`str(x)` is intended to be readable; `repr(x)` is intended to expose a Python-oriented representation that often makes escapes visible. Neither guarantees HTML/SQL/shell safety. An f-string is an expression and can execute normal Python expressions; do not evaluate user-supplied f-string source or use `eval` on untrusted data.
+
+For logging, keep confidential data **out** of the message instead of trying to escape it after it has entered a public sink. Escape text for its eventual output context: HTML text, a URL component, a CSV cell and a shell argument have different encoding rules. SQL queries need parameterized statements, not hand-crafted string escaping.
+
+**Trace a formatting example:**
+
+```python
+# DEEP_CORE_RUNNABLE
+from html import escape
+
+message = "audit\nfailed"
+assert "\\n" in repr(message)
+assert "\n" in message
+tag = "<script>untrusted</script>"
+assert escape(tag, quote=True).startswith("&lt;script&gt;")
+name = "alice"
+count = 3
+assert f"{name}: {count:03d}" == "alice: 003"
+print("D01-I: representations are not security sanitizers")
+```
+
+**Prompt:** Why is it incorrect to treat HTML escaping as a general sanitizer for a value that later goes into a SQL query? Why is redaction often preferable to logging secrets and trying to hide them in a UI?
+
+## 1.17 Deep Core X — Your first integrated defensive Python program
+
+A beginner project should prove that you can connect the language elements without copying a monolithic solution. Your integrated task is to build an **offline authentication-event summarizer**. It reads synthetic data, validates each record's exact shape and permitted actions, counts events per actor, preserves the distinction between *complete* and *incomplete*, and prints a report only after the full source has passed validation.
+
+**Recommended file layout:**
+
+```text
+python-foundations-lab/
+  auth_summary.py              # pure functions + explicit CLI
+  test_auth_summary.py         # tests from beginner to adversarial
+  fixtures/
+    valid.jsonl
+    invalid-third-record.jsonl
+  report.md                    # observed output and limitations
+```
+
+| Contract | Requirement | Example negative test |
+|---|---|---|
+| Read | owned, local file; max 1000 lines and 4096 bytes per line | extra-long line |
+| Parse | strict UTF-8 and JSON object, no duplicate keys | `{"actor":"a","actor":"b"}` |
+| Schema | exactly actor, action, timestamp, source, event_id | missing source |
+| Validate | correct types, length, timezone-aware timestamp | `action=None`, naive time |
+| Count | one source-qualified ID per event | duplicate ID |
+| Report | complete result or explicit error | corrupt third record |
+| Safety | never disable accounts; no live network | absence of outbound requests |
+
+A complete, tested reference implementation is provided in the [Chapter 01 project](../projects/foundations/auth_summary.py) with [unit tests](../tests/test_foundations_projects.py). **Attempt your own implementation first.** The reference intentionally keeps authorization and source authenticity out of scope; it does not establish that the logs are truthful.
+
+## 1.18 Deep Core XI — Exercises are a progression, not an answer to memorize
+
+Work from [Chapter 01 — 25 Independent Exercises](../python/exercises/01-LANGUAGE-FOUNDATIONS-EXERCISES.md). The exercises include prediction, debugging, implementation, testing and explanation. Do not open the [separate solution key](../python/solutions/01-LANGUAGE-FOUNDATIONS-SOLUTIONS.md) until you have written and tested your own answer.
+
+**Suggested pass standard:**
+- **Beginner:** all input/output prediction tasks correct and no accidental shared-state bugs.
+- **Intermediate:** valid/invalid schema tests and a working self-contained program.
+- **Advanced:** explain the threat boundary, demonstrate failure propagation and defend a design decision.
+- **Project:** repeatable test command, supported Python version, synthetic fixtures, and a report stating incomplete-input behavior.
+
+## 1.19 Consolidation — Correctness you should be able to explain aloud
+
+| Question | Key reasoning checkpoint |
+|---|---|
+| How does assignment differ from mutation? | names bind to objects; aliasing reveals in-place changes |
+| Why is `bool` an unsafe integer stand-in at a JSON boundary? | `bool` subclasses `int`; domain type matters |
+| Can a valid Unicode string have multiple byte encodings? | yes across encodings; UTF-8 gives a specific mapping per code-point sequence |
+| Why is truthiness not field presence? | zero and empty values can be present but falsy |
+| Why not use `zip` without strict mode for paired audit sources? | it may silently truncate |
+| Does a `match` mapping pattern enforce an exact schema? | not by itself; additional keys may be present |
+| Do type annotations validate untrusted JSON automatically? | no, runtime validators do that |
+| If a parser fails after a valid record, is a partial count a complete report? | no, completeness is separate |
+
+
 ## 1. Python's execution model
 Python programs are modules of statements; CPython commonly compiles source to bytecode interpreted by its virtual machine. Variables are **names bound to objects**, not fixed-size boxes. Objects have identity, type, and value. Python is dynamically typed, but type annotations can document expected values and aid static checking. Indentation defines blocks.
 
