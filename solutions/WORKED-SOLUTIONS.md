@@ -280,9 +280,9 @@ def crossings(times: list[int], *, threshold: int = 3, span: int = 60):
     for t in times:
         while q and t - q[0] > span:
             q.popleft()
+        q.append(t)
         if len(q) < threshold:
             active = False
-        q.append(t)
         if len(q) >= threshold and not active:
             alerts.append(t)
             active = True

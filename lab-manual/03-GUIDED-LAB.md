@@ -48,9 +48,9 @@ def crossing_times(records, threshold=3, span=60, max_actors=100):
         q = windows[actor]
         while q and timestamp - q[0] > span:
             q.popleft()
-        if len(q) < threshold:
-            active.discard(actor)
         q.append(timestamp)
+        if len(q) < threshold:
+            active.discard(actor)  # clear latch only if post-arrival count is low
         if len(q) >= threshold and actor not in active:
             active.add(actor)
             yield actor, timestamp

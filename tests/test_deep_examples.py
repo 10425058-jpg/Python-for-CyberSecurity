@@ -121,6 +121,18 @@ class MiniSocTests(unittest.TestCase):
         self.assertEqual(alerts[0]["supporting_event_ids"],
                          ["lab:1", "lab:2", "lab:3"])
 
+    def test_no_repeated_alert_when_window_stays_at_threshold(self):
+        """When one old event expires and one new arrives, latch stays active."""
+        rows = [
+            event_line("2026-01-01T10:00:00Z", event_id="t0"),
+            event_line("2026-01-01T10:00:30Z", event_id="t30"),
+            event_line("2026-01-01T10:01:00Z", event_id="t60"),
+            event_line("2026-01-01T10:01:01Z", event_id="t61"),
+        ]
+        alerts = list(detect_bursts(as_events(rows), threshold=3, window_seconds=60))
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]["supporting_event_ids"], ["lab:t0","lab:t30","lab:t60"])
+
     def test_dedup_replayed_event(self):
         rows = [
             event_line("2026-01-01T10:00:00Z", event_id="duplicate"),

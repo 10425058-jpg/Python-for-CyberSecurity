@@ -216,9 +216,9 @@ def burst_crossings(events, *, window=60, threshold=3, max_actors=100):
         q = queues[actor]
         while q and t - q[0] > window:
             q.popleft()
+        q.append(t)
         if len(q) < threshold:
             active.discard(actor)
-        q.append(t)
         if len(q) >= threshold and actor not in active:
             active.add(actor)
             yield {"actor": actor, "time": t, "count": len(q)}
