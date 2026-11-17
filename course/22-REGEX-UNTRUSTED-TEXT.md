@@ -119,3 +119,129 @@ The time pattern is deliberately lexical, *not* a full timestamp validator. Afte
 6. Explain why a regex accepting a domain name doesn't prove it is an approved network destination.
 
 **References:** [re](https://docs.python.org/3/library/re.html), [regex HOWTO](https://docs.python.org/3/howto/regex.html), [OWASP input validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html).
+
+
+## 8. End-to-end untrusted log parsing example
+
+**Scenario:** a toy log line is `time=2026-01-01T10:00:00Z user=alex action=login_failure`. You want to extract exactly three fields without accepting extra suffixes, ambiguous whitespace or arbitrarily large input.
+
+### Define the grammar first
+
+```text
+line        := "time=" iso_lexeme " user=" username " action=" action
+iso_lexeme  := 1..40 ASCII chars from [0-9T:+-.Z]
+username    := 1..64 ASCII letters/digits/underscore/dash/dot
+action      := "login_success" | "login_failure"
+```
+
+A **lexical** grammar only controls the shape. You still need a semantic timestamp parser and a timezone requirement.
+
+### Complete parser with full-string validation
+
+```python
+import re
+from datetime import datetime, timezone
+
+PATTERN = re.compile(
+    r"time=(?P<time>[0-9T:+.Z-]{1,40}) "
+    r"user=(?P<user>[A-Za-z0-9_.-]{1,64}) "
+    r"action=(?P<action>login_failure|login_success)"
+)
+
+def parse_lab_log(line: str) -> dict:
+    if type(line) is not str or not 1 <= len(line) <= 160:
+        raise ValueError("line type/length invalid")
+    match = PATTERN.fullmatch(line)
+    if match is None:
+        raise ValueError("line does not match toy grammar")
+    parts = match.groupdict()
+    try:
+        timestamp = datetime.fromisoformat(
+            parts["time"].replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise ValueError("invalid timestamp") from exc
+    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+        raise ValueError("timezone offset required")
+    return {
+        "time_utc": timestamp.astimezone(timezone.utc).isoformat(),
+        "user": parts["user"],
+        "action": parts["action"],
+    }
+
+event = parse_lab_log(
+    "time=2026-01-01T10:00:00Z user=alex action=login_failure"
+)
+assert event["user"] == "alex"
+assert event["time_utc"] == "2026-01-01T10:00:00+00:00"
+```
+
+**Walkthrough:**
+1. Cap the whole input string length *before* matching.
+2. Use an ASCII grammar rather than unqualified `\w` or `\d` when protocol semantics require ASCII.
+3. Use `fullmatch` to reject trailing or leading payloads.
+4. Extract named groups rather than brittle numerical group indexes.
+5. Parse timestamp semantics with `datetime` and require an offset.
+6. Return structured normalized data, not raw text.
+
+A log's original string should be kept separately in an evidence system. This example intentionally handles only one invented format; do not assume its grammar covers systemd journald or Windows Event Logs.
+
+## 9. Demonstrate two security-relevant mistakes
+
+### Mistake 1: searching instead of validating
+
+```python
+import re
+assert re.search(r"[0-9]+", "port=443EVIL") is not None
+assert re.fullmatch(r"[0-9]+", "port=443EVIL") is None
+```
+
+A successful substring search does not mean the full input is valid. This can lead to authorization or parsing errors if the application silently ignores suffixes.
+
+### Mistake 2: assuming regex prevents SQL injection
+
+Even if a username matches a restricted grammar, SQL must use parameters. Validation and parameterization solve **different** problems. Regex is not a substitute for HTML output encoding, path safety, or per-object authorization either.
+
+## 10. ReDoS and resource budgeting
+
+Regex denial of service arises when a pattern explores exponentially many paths for adversarial text, particularly with ambiguous nested quantifiers. Avoid using dangerous expressions on long untrusted inputs. Before matching:
+- Cap byte size, not only Python characters.
+- Prefer anchored/simple bounded patterns.
+- Avoid backtracking-heavy nested repetition.
+- Use specialized format parsers for JSON/CSV/HTML/XML.
+- Consider execution time/CPU caps for user-configurable patterns.
+- Don't accept arbitrary user-supplied regex on privileged production telemetry without review.
+
+A length cap helps, but on its own does not guarantee predictable runtime for every pathological pattern. The regex engine and pattern structure both matter.
+
+## 11. Tests and answer keys
+
+```python
+bad_lines = [
+    " time=2026-01-01T10:00:00Z user=alex action=login_failure",
+    "time=2026-01-01T10:00:00 user=alex action=login_failure",
+    "time=2026-01-01T10:00:00Z user=alex action=login_failure extra",
+    "time=2026-01-01T10:00:00Z user= action=login_failure",
+    "time=2026-01-01T10:00:00Z user=alex action=unknown",
+]
+for line in bad_lines:
+    try:
+        parse_lab_log(line)
+    except ValueError:
+        continue
+    raise AssertionError("invalid line accepted")
+```
+
+**Exercise A:** Modify the grammar to allow a quoted user field with spaces. Explain why naive splitting at spaces fails and choose a proper escaping/quoting specification.
+
+**Exercise B:** Accept IPv4 and IPv6 source addresses. Use regex only for lexical extraction and `ipaddress.ip_address` for semantic validation.
+
+**Exercise C:** Compare `re.match`, `re.search` and `re.fullmatch`. Which should a strict validator use? Usually `fullmatch` when the entire value must conform.
+
+**Exercise D:** Construct a local-only performance test comparing a safe bounded regex with a poorly designed backtracking pattern under time limits. Do not deploy it to a real service.
+
+**Exercise E:** Decide whether rejecting non-ASCII usernames is appropriate. Answer: depends on policy; many real identities are Unicode, so preserve intended semantics and define normalization rather than imposing ASCII arbitrarily.
+
+**Exercise F:** Describe why a legitimate-looking log message might still be untrustworthy: attacker-generated inputs can be recorded by authentic logging infrastructure.
+
+**References:** [Python regular expressions](https://docs.python.org/3/library/re.html), [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html).
