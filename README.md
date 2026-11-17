@@ -8,6 +8,17 @@
 
 **Start with the [complete Python textbook](python/README.md).** The original twelve `python/` chapters are now substantial beginner-to-advanced teaching modules, not short reference notes. Each adds a first-principles explanation, local runnable code with assertions, a step-by-step trace, input failure scenarios, and beginner/intermediate/advanced exercises. [The dedicated CI suite](tests/test_python_textbook_chapters.py) executes one complete standard-library example per chapter, while the [editorial checklist](reference/PYTHON-FOUNDATIONS-TEXTBOOK-RUBRIC.md) tracks learning quality. This is the recommended starting point **before** the specialized Cybersecurity course.
 
+## Deep Core 01–02 — Strengthened Python and Algorithms curriculum
+
+The two most important foundational chapters have been expanded again, with **19 additional executable mini-lessons** covering object identity, numeric and Unicode edge cases, closures, `match`, strict iteration, recursion, sorting and binary search, graph BFS/DFS, Dijkstra, dynamic programming, priority queues and bounded aggregation.
+
+- **[Chapter 01 — Language Foundations](python/01-LANGUAGE-FOUNDATIONS.md)** and [25 independent exercises](python/exercises/01-LANGUAGE-FOUNDATIONS-EXERCISES.md).
+- **[Chapter 02 — Data Structures & Algorithms](python/02-DATA-STRUCTURES-ALGORITHMS.md)** and [25 independent exercises](python/exercises/02-DATA-STRUCTURES-ALGORITHMS-EXERCISES.md).
+- **[50 separate worked solutions](python/solutions/README.md)**, each with executable reference code.
+- **[Two integrated offline portfolio projects](projects/foundations/README.md):** strict authentication JSONL summary and bounded rolling-window detection, with synthetic fixtures and regression tests.
+
+This is a deliberate **deepening of Chapters 01–02 first**, not a claim that every remaining chapter 03–11 has already undergone the same additional editorial pass.
+
 ## New: Masterclass Quality Pass — every Deep Dive chapter
 
 **All 22 chapters** now include an individually designed *Masterclass* teaching case: a subtle misconception, an explicit causal model, a concrete comparison table, one **standalone, tested Python example**, and an independent transfer exercise. The new examples focus on correctness **and** what the code does not prove. They cover Python type/key collisions, false all-clears, exact sliding-window alert semantics, bounded parsing, SQL rollback, per-object authorization, mutation tests, TaskGroup failure propagation, DNS/SSRF trust, HMAC replay, SOC base rates, timestamp uncertainty, TCP capture gaps, benign high entropy, incomplete cloud inventories, vulnerability applicability, ML leakage and more.

@@ -20,6 +20,10 @@ P5 — Mini SOC: bounded ingest → dedup → rolling windows → review alerts
 Production-readiness gap review (not automatic deployment)
 ```
 
+## Before Stage 0: two guided foundation projects
+
+For learners starting from zero, practice [Chapter 01 (language and strict JSONL)](../python/01-LANGUAGE-FOUNDATIONS.md) and [Chapter 02 (algorithms and bounded windows)](../python/02-DATA-STRUCTURES-ALGORITHMS.md). Their [two complete local starter projects](foundations/README.md) and [50 independent problems](../python/exercises/README.md) establish real parser, data-structure and testing skills before proceeding with the broader portfolio ladder.
+
 ## Stage 0 — Foundations (1 week, around 10 focused hours)
 
 **Deliverables:** Python 3.11+ environment, full unit test pass, two handwritten validators, and a trust-boundary diagram.
