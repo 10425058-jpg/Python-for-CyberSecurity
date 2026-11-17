@@ -1,5 +1,7 @@
 # Deep Dive 16 — Cloud security, container isolation and DevSecOps using Python
 
+> **Hands-on:** [Chapter 16 Guided Lab](../lab-manual/16-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Run negative tests and document limitations.
+
 **Level:** intermediate → advanced · **Estimated study:** 12–18 hours.
 
 ## Mission: audit a synthetic cloud inventory without any cloud account

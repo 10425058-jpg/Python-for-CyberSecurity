@@ -1,5 +1,7 @@
 # Deep Dive 11 — Cryptography in Python: hashes, MACs, passwords, encryption and trust
 
+> **Hands-on:** [Chapter 11 Guided Lab](../lab-manual/11-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Run negative tests and document limitations.
+
 **Level:** intermediate → advanced · **Estimated study:** 12–18 hours.
 
 ## Security goals before algorithms

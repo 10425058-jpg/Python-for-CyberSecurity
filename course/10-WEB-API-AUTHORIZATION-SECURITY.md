@@ -1,5 +1,7 @@
 # Deep Dive 10 — Python web APIs, authentication, authorization and injection defenses
 
+> **Hands-on:** [Chapter 10 Guided Lab](../lab-manual/10-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Run negative tests and document limitations.
+
 **Level:** intermediate · **Estimated study:** 12–16 hours.
 
 ## Case study: a security report API

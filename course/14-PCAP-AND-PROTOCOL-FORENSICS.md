@@ -1,5 +1,7 @@
 # Deep Dive 14 — Offline packet captures and Python protocol forensics
 
+> **Hands-on:** [Chapter 14 Guided Lab](../lab-manual/14-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Run negative tests and document limitations.
+
 **Level:** intermediate → advanced · **Estimated study:** 10–14 hours.
 
 ## Learning outcome

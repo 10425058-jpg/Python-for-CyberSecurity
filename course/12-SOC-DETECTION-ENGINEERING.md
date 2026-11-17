@@ -1,5 +1,7 @@
 # Deep Dive 12 — Build a Python SOC detection pipeline with evidence and measurable quality
 
+> **Hands-on:** [Chapter 12 Guided Lab](../lab-manual/12-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Run negative tests and document limitations.
+
 **Level:** intermediate → advanced · **Estimated study:** 15–22 hours.
 
 ## Mission: detect suspicious bursts of failed logins
