@@ -177,3 +177,106 @@ This rule assumes `event_id` and `action` were already validated. If exposed dir
 - Alerts are evidence-based and never silently trigger high-impact actions.
 
 **Reading:** [typing](https://docs.python.org/3/library/typing.html), [dataclasses](https://docs.python.org/3/library/dataclasses.html), [dependency injection discussion (Python guide)](https://docs.python-guide.org/writing/structure/).
+
+
+## 10. A fully traceable detection engine: interfaces and unit-test doubles
+
+Your goal: replace a one-file script that reads logs, calculates risk, writes to a database and posts alerts, with a design whose **decision logic is pure** and whose side effects are independently testable.
+
+### Design first: input, output, and responsibility
+
+| Layer | Input | Output | Side effects allowed |
+|---|---|---|---|
+| Reader | path / approved API | raw records | file/network read |
+| Validator | raw record | verified `AuthEvent` | none |
+| Rule | verified event | `Finding` or `None` | none |
+| Storage | finding | confirmation/status | database write |
+| Presenter | findings | redacted report | stdout/file |
+
+The rule should never directly disable a user or call an external service. The data model can state invariants that the validator must actually enforce at runtime.
+
+### Reference design with a test double
+
+```python
+from dataclasses import dataclass
+from typing import Protocol, Iterable
+
+@dataclass(frozen=True)
+class AuthEvent:
+    event_id: str
+    actor: str
+    action: str
+
+@dataclass(frozen=True)
+class Finding:
+    event_id: str
+    description: str
+
+class ReadPort(Protocol):
+    def read(self) -> Iterable[AuthEvent]: ...
+
+class WritePort(Protocol):
+    def save(self, finding: Finding) -> None: ...
+
+class FailureRule:
+    def evaluate(self, event: AuthEvent) -> Finding | None:
+        if event.action == "login_failure":
+            return Finding(event.event_id, "failed login observed")
+        return None
+
+class DetectionService:
+    def __init__(self, reader: ReadPort, writer: WritePort):
+        self.reader = reader
+        self.writer = writer
+        self.rule = FailureRule()
+
+    def run(self) -> int:
+        count = 0
+        for event in self.reader.read():
+            finding = self.rule.evaluate(event)
+            if finding is not None:
+                self.writer.save(finding)
+                count += 1
+        return count
+
+class FakeReader:
+    def read(self):
+        yield AuthEvent("e1", "alex", "login_failure")
+        yield AuthEvent("e2", "alex", "login_success")
+
+class FakeWriter:
+    def __init__(self):
+        self.saved = []
+    def save(self, finding):
+        self.saved.append(finding)
+
+writer = FakeWriter()
+assert DetectionService(FakeReader(), writer).run() == 1
+assert writer.saved[0].event_id == "e1"
+```
+
+**Why this architecture matters:** A unit test can reproduce the scenario without files, cloud access or secrets. A broken storage adapter does not change rule logic. In production, however, you still need a transactional delivery contract: if `writer.save` fails after several successful writes, your program must record *partial completion*. This example does not provide exactly-once delivery.
+
+## 11. The hidden danger in type hints
+
+A `Protocol` describes what methods an object should implement to a type checker. At runtime, another object might still return malicious or malformed data. A `dataclass(frozen=True)` documents immutability but does not validate values on construction and does not freeze mutable nested objects.
+
+### Trust boundary placement
+- Network payload → runtime validator → `AuthEvent`.
+- Internal rule → typed `Finding` → output schema validator.
+- Persistent storage → schema/permissions checks before rendering.
+- Vendor SDK → validate responses despite "trusted" source.
+
+A safe architecture never assumes "it has a Python type annotation, therefore it is safe."
+
+## 12. Exercise: failure semantics and testing
+
+1. **Break the sink:** make `FakeWriter.save` raise on its second call. Describe which findings were persisted and why "0 findings" would be misleading.
+2. **Make rules pluggable:** inject a `Rule` protocol instead of constructing `FailureRule` inside `DetectionService`. Test with a `AlwaysNoneRule` and an `AlwaysFindingRule`.
+3. **Add validation:** create a factory that verifies event ID (1–64 chars), actor (1–128) and action membership before building `AuthEvent`.
+4. **Test import safety:** ensure importing the module does not contact the network or write files.
+5. **Discuss transactions:** should findings be written all-or-nothing per batch? Describe SQLite transaction use and when streaming partial processing is acceptable.
+
+**Answer guide:** (1) one record may already be saved; a thrown exception does not roll back other systems; (2) composition lets tests substitute behavior; (3) type hints alone are insufficient; (5) choose atomicity explicitly according to operational requirements.
+
+**Architecture quality gate:** draw where authentication, authorization, validation, retention and audit checks occur. If none of these has a clear owner, the design isn't ready for a real security workload.

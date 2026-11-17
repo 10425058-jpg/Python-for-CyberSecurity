@@ -193,3 +193,120 @@ analyst review
 5. Why preserve the original timestamp? *Normalization may hide source ambiguity and clock errors.*
 
 **References:** [json](https://docs.python.org/3/library/json.html), [csv](https://docs.python.org/3/library/csv.html), [sqlite3](https://docs.python.org/3/library/sqlite3.html), [OWASP Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html).
+
+
+## 10. Detailed ingestion case study: source data, validation and a transaction
+
+Consider a source that sends the following synthetic lines:
+
+```json
+{"event_id":"A1","timestamp":"2026-01-01T10:00:00Z","actor":"alice","action":"login_failure"}
+{"event_id":"A2","timestamp":"2026-01-01T17:01:00+07:00","actor":"alice","action":"login_success"}
+```
+
+A robust pipeline distinguishes five stages: **bytes → decoded text → parsed JSON → validated event → committed database record**. Each stage can fail for different reasons, so the program must not report success when the input was only partially processed.
+
+### A streaming and transactional example
+
+```python
+from pathlib import Path
+import json
+import sqlite3
+from contextlib import closing
+from datetime import datetime, timezone
+
+MAX_LINE = 8192
+
+def bounded_records(path: Path):
+    with path.open("rb") as stream:
+        number = 0
+        while True:
+            raw = stream.readline(MAX_LINE + 1)
+            if not raw:
+                break
+            number += 1
+            if len(raw) > MAX_LINE:
+                raise ValueError(f"line {number}: too many bytes")
+            try:
+                record = json.loads(raw.decode("utf-8", "strict"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError(f"line {number}: bad JSON/UTF-8") from exc
+            if type(record) is not dict:
+                raise ValueError(f"line {number}: object required")
+            yield number, record
+
+def validated_event(row: dict) -> tuple[str, str, str, str]:
+    required = {"event_id", "timestamp", "actor", "action"}
+    if set(row) != required:
+        raise ValueError("exact schema required")
+    if any(type(row[k]) is not str for k in required):
+        raise ValueError("all fields must be strings")
+    if not 1 <= len(row["event_id"]) <= 64:
+        raise ValueError("bad event id")
+    if not 1 <= len(row["actor"]) <= 64:
+        raise ValueError("bad actor")
+    if row["action"] not in ("login_failure", "login_success"):
+        raise ValueError("unsupported action")
+    when = datetime.fromisoformat(row["timestamp"].replace("Z","+00:00"))
+    if when.tzinfo is None or when.utcoffset() is None:
+        raise ValueError("timezone required")
+    return (row["event_id"], when.astimezone(timezone.utc).isoformat(),
+            row["actor"], row["action"])
+
+def import_events(path: Path, connection: sqlite3.Connection):
+    with connection:  # rollback all writes if any row fails
+        connection.execute("""CREATE TABLE IF NOT EXISTS events (
+            event_id TEXT PRIMARY KEY,
+            timestamp_utc TEXT NOT NULL,
+            actor TEXT NOT NULL,
+            action TEXT NOT NULL
+        )""")
+        for line_number, raw in bounded_records(path):
+            try:
+                values = validated_event(raw)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"line {line_number}: invalid event") from exc
+            connection.execute(
+                "INSERT INTO events VALUES (?, ?, ?, ?)", values
+            )
+```
+
+The example intentionally aborts on the first malformed row. An existing duplicate ID also aborts the transaction with a SQLite integrity error; it does *not* silently overwrite prior evidence. The caller owns the connection and must close it. A real service also needs total record caps, parser nesting controls, access control, preservation of original bytes, and an idempotent replay policy.
+
+**Subtle point:** the `with connection:` context manager handles transaction commit/rollback but does not close the connection. Use `contextlib.closing` or an explicit lifecycle.
+
+## 11. Source authenticity and ambiguity
+
+Even impeccably parsed JSON may be false evidence. An attacker could place text in the actor field, alter clocks, or cause a legitimate process to log a misleading message. Therefore:
+- Preserve a source identifier and checksum of original input.
+- Record both source-event time and ingestion time.
+- Normalize schema fields without silently changing identity meaning.
+- Track rejected rows and duplicates.
+- Validate who is authorized to submit data; a valid JSON payload is not an authenticated event.
+
+A **valid** record is not the same as a **true** record.
+
+### Broken assumptions checklist
+
+| Mistaken assumption | Why it fails | Mitigation |
+|---|---|---|
+| "JSON means safe" | data types and nesting may be hostile | bounded strict schema |
+| "UTF-8 characters = bytes" | multibyte encodings | cap raw bytes |
+| "CSV quoting prevents formulas" | spreadsheets may evaluate formula cells | consumer-specific export |
+| "Path within root is secure" | symlink/TOCTOU races | file-descriptor-based controls |
+| "SQLite transaction closes connection" | it does not | explicit close |
+| "A unique event ID proves provenance" | IDs may be attacker-controlled | source qualification and authentication |
+
+## 12. Exercise set with verification
+
+**A:** Create a three-line file where the third line is malformed. Import it into an empty SQLite connection. A correct all-or-nothing transaction should leave no event rows after rollback (table creation timing may depend on schema handling).
+
+**B:** Introduce a byte-order-mark at the beginning of a UTF-8 file. Decide explicitly whether your format allows BOM; test `utf-8` versus `utf-8-sig` behavior and document why arbitrary normalization can change evidence.
+
+**C:** Add a source-qualified key `(source,event_id)` rather than global `event_id`. Explain why two logging systems could legitimately reuse local IDs.
+
+**D:** Extend the example to store `original_timestamp` and `ingest_time_utc`. Prove that timestamps from +07:00 and Z can represent the same instant.
+
+**E:** Write a test for an array or bool where a dictionary was required. Ensure you get a clear error rather than a silent skipped record.
+
+For more on current input-validation principles, read [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html).
