@@ -7,6 +7,70 @@
 ## Mission
 An administrator reports a suspicious account sign-in on a lab VM. You are asked to create a *defensible timeline* from synthetic authentication logs and read-only file metadata. The goal is not to "prove" compromise immediately, but to preserve evidence, explain uncertainty and support an authorized response.
 
+## Masterclass — timestamps describe claims, not guaranteed event order
+
+A forensic timeline often sorts timestamps and displays a single neat sequence. That is useful but can create false confidence: source clocks can drift and timestamps may have coarse precision. If event A is recorded at 10:00:05 with uncertainty ±15 seconds and event B at 10:00:20 with uncertainty ±15 seconds, **their possible intervals overlap**. The labels A-before-B are not proof of actual order.
+
+**Three different times:**
+- **Source event time:** what the system claims happened and when.
+- **Ingest/collection time:** when the collector recorded or received the event.
+- **Report generation time:** when an analyst produced the derivative timeline.
+
+Retain all three if available, with original offsets, source IDs and acquisition metadata. Do not silently replace an unknown time zone with UTC.
+
+| Event | Recorded UTC | ± uncertainty | Possible interval |
+|---|---|---|---|
+| A | 10:00:05 | 15 s | 09:59:50–10:00:20 |
+| B | 10:00:20 | 15 s | 10:00:05–10:00:35 |
+
+**Runnable uncertainty-aware comparison:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+@dataclass(frozen=True)
+class EvidenceTime:
+    source: str
+    original: str
+    uncertainty_seconds: int
+
+    def interval(self):
+        stamp = datetime.fromisoformat(
+            self.original.replace("Z", "+00:00")
+        )
+        if stamp.utcoffset() is None or self.uncertainty_seconds < 0:
+            raise ValueError("timestamp offset/uncertainty required")
+        center = stamp.astimezone(timezone.utc)
+        spread = timedelta(seconds=self.uncertainty_seconds)
+        return center - spread, center + spread
+
+def definitely_before(a: EvidenceTime, b: EvidenceTime) -> bool:
+    return a.interval()[1] < b.interval()[0]
+
+a = EvidenceTime("toy-idp", "2026-01-01T10:00:05Z", 15)
+b = EvidenceTime("toy-endpoint", "2026-01-01T17:00:20+07:00", 15)
+assert not definitely_before(a, b)
+assert not definitely_before(b, a)
+
+c = EvidenceTime("toy-idp", "2026-01-01T10:02:00Z", 1)
+assert definitely_before(a, c)
+try:
+    EvidenceTime("bad", "2026-01-01T10:00:00", 0).interval()
+except ValueError:
+    pass
+else:
+    raise AssertionError("offset-free evidence accepted")
+```
+
+**Trace:** `17:00:20+07:00` becomes `10:00:20Z`. A's latest possible time (10:00:20) overlaps B's earliest (10:00:05), so actual order is indeterminate. C is much later than A even accounting for uncertainty. The inequality is deliberately strict: touching intervals do not prove strict order.
+
+**What a defensible report says:** "The sources record an apparent sequence A, B, C; A and B cannot be confidently ordered given the stated clock uncertainty. Source clocks and collection integrity require independent confirmation." It does **not** say "B must have followed A" or attribute intent to a particular person.
+
+**Exercise:** hash the exact bytes of two synthetic source files, store original timestamps and normalized UTC as separate fields, then create a report with facts, alternative explanations and missing corroboration. Explain why a file hash cannot establish source authenticity or intent. Use the [incident timeline build](../projects/BUILD-PATH.md) as a practical continuation.
+
+
 ## 1. What DFIR does
 
 **Digital forensics** applies disciplined acquisition, preservation, examination, analysis and reporting of digital evidence. **Incident response** coordinates detection, triage, containment, eradication, recovery and improvement within an organization's risk framework. The current NIST SP 800-61 Rev. 3 (April 2025) aligns incident response recommendations with the NIST Cybersecurity Framework 2.0 rather than treating response as an isolated linear checklist.
