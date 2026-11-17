@@ -36,6 +36,10 @@ This rubric applies specifically to the twelve files in [the expanded Python tex
 | 10 | argparse, packaging, build-time code execution and supply chain |
 | 11 | implementation details, profiling, cardinality and cache isolation |
 
+## Additional review target for 01 and 02
+
+The [extra-deep language chapter](../python/01-LANGUAGE-FOUNDATIONS.md) and [algorithm chapter](../python/02-DATA-STRUCTURES-ALGORITHMS.md) now include multiple independent runnable examples. Reviewers should verify that explanations of object aliasing, decimal/Boolean semantics, Unicode codepoints, closures, hash-key contracts, recursion, binary search, merge sort, graph traversal, Dijkstra and DP match their observed behavior. The [50 separate answer snippets](../python/solutions/README.md) and the [local project tests](../tests/test_foundations_projects.py) are executed by CI. **These tests supplement, not replace, independent human technical editing.**
+
 ## Test scope and honest limitations
 
 [The textbook regression suite](../tests/test_python_textbook_chapters.py) executes the code block explicitly tagged `# TEXTBOOK_RUNNABLE` in each chapter, under a subprocess deadline and multiple supported Python interpreters. It verifies reproducibility of the *new main example*. It does not execute every legacy snippet or independently review every statement for currency.

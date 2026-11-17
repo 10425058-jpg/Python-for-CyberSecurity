@@ -13,6 +13,12 @@
 - [Python textbook 00–11](../python/README.md): foundations, algorithms, functions, I/O, tests, OOP, iterators, concurrency, OS, packaging and internals.
 - [Textbook editorial rubric](PYTHON-FOUNDATIONS-TEXTBOOK-RUBRIC.md) and [12-example regression suite](../tests/test_python_textbook_chapters.py).
 
+## Extra-deep Python chapters 01–02
+
+- [Language Foundation deep chapter](../python/01-LANGUAGE-FOUNDATIONS.md) · [25 exercises](../python/exercises/01-LANGUAGE-FOUNDATIONS-EXERCISES.md) · [worked solutions](../python/solutions/01-LANGUAGE-FOUNDATIONS-SOLUTIONS.md)
+- [Data Structures & Algorithms deep chapter](../python/02-DATA-STRUCTURES-ALGORITHMS.md) · [25 exercises](../python/exercises/02-DATA-STRUCTURES-ALGORITHMS-EXERCISES.md) · [worked solutions](../python/solutions/02-DATA-STRUCTURES-ALGORITHMS-SOLUTIONS.md)
+- [Integrated project path with synthetic fixtures](../projects/foundations/README.md) and [automated tests](../tests/test_foundations_projects.py)
+
 ## Part I — Programming foundations (12 chapters)
 | Chapter | Key competencies | Practice artifact |
 |---|---|---|

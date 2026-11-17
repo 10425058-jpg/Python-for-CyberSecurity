@@ -29,6 +29,38 @@ def audit() -> tuple[list[str], dict[str, int]]:
     if len(answers) != 10:
         errors.append(f"expected 10 answer volumes, found {len(answers)}")
 
+    foundation_sources = [
+        ROOT / "python/01-LANGUAGE-FOUNDATIONS.md",
+        ROOT / "python/02-DATA-STRUCTURES-ALGORITHMS.md",
+        ROOT / "python/README.md",
+        ROOT / "python/exercises/README.md",
+        ROOT / "python/solutions/README.md",
+        ROOT / "projects/foundations/README.md",
+        ROOT / "reference/PYTHON-FOUNDATIONS-TEXTBOOK-RUBRIC.md",
+    ]
+    foundation_exercises = [
+        ROOT / "python/exercises/01-LANGUAGE-FOUNDATIONS-EXERCISES.md",
+        ROOT / "python/exercises/02-DATA-STRUCTURES-ALGORITHMS-EXERCISES.md",
+    ]
+    foundation_solutions = [
+        ROOT / "python/solutions/01-LANGUAGE-FOUNDATIONS-SOLUTIONS.md",
+        ROOT / "python/solutions/02-DATA-STRUCTURES-ALGORITHMS-SOLUTIONS.md",
+    ]
+    for number, (exercise, solution) in enumerate(
+        zip(foundation_exercises, foundation_solutions, strict=True), start=1
+    ):
+        prefix = f"{number:02d}"
+        exercises_text = exercise.read_text(encoding="utf-8")
+        solutions_text = solution.read_text(encoding="utf-8")
+        if len(re.findall(
+            rf"(?m)^### Exercise {prefix}\.\d{{2}} — ", exercises_text
+        )) != 25:
+            errors.append(f"{exercise.relative_to(ROOT)}: need 25 exercises")
+        if len(re.findall(
+            rf"(?m)^## Solution {prefix}\.\d{{2}} — ", solutions_text
+        )) != 25:
+            errors.append(f"{solution.relative_to(ROOT)}: need 25 solutions")
+
     all_files = chapters + labs + answers
     snippets = 0
     answered = []
@@ -62,7 +94,7 @@ def audit() -> tuple[list[str], dict[str, int]]:
         ROOT / "reference/CHAPTER-INDEX.md",
         ROOT / "reference/100-EXERCISES.md",
         ROOT / "projects/BUILD-PATH.md",
-    ] + all_files
+    ] + all_files + foundation_sources + foundation_exercises + foundation_solutions
     links_count = 0
     for path in nav:
         text = ANY_FENCE.sub("", path.read_text(encoding="utf-8"))
@@ -81,6 +113,7 @@ def audit() -> tuple[list[str], dict[str, int]]:
         "chapters": len(chapters), "labs": len(labs),
         "answer_volumes": len(answers), "answered_exercises": len(answered),
         "python_blocks": snippets, "local_links": links_count,
+        "foundation_exercises": 50, "foundation_solutions": 50,
     }
 
 

@@ -19,6 +19,14 @@
 | 10 | [Chapter 10](10-CLI-PACKAGING-DEPENDENCIES.md) | CLI design, pyproject.toml, dependency trust and CI |
 | 11 | [Chapter 11](11-INTERNALS-PERFORMANCE-ADVANCED.md) | CPython internals, profiling, memory, caching and resource limits |
 
+## Special focus: Deep Core 01 and 02
+
+Chapters **01** and **02** now contain an extensive extra learning layer beyond their prior Extended Textbook lessons. Start with the concept and trace tables, run each of the **19 new `# DEEP_CORE_RUNNABLE` snippets**, then solve the **[50 independent exercises](exercises/README.md)** before opening the **[separate solutions](solutions/README.md)**.
+
+The [two full local defensive projects](../projects/foundations/README.md) connect these concepts to JSONL parsing, bounded queues, UTC event-time windows, error propagation and atomic reporting. Their [regression tests](../tests/test_foundations_projects.py) cover malformed input, duplicate event IDs, thresholds, resource caps and previous-report preservation.
+
+**Important scope:** Other chapters (00, 03–11) retain their existing Expanded Textbook content; the extra-deep 01–02 pass is a starting milestone, not a completeness claim for all of Python.
+
 ## A realistic schedule at 10 hours per week
 
 **Weeks 1–2:** Chapters 00–01. Configure your interpreter and write/trace the first complete programs.  
