@@ -7,6 +7,86 @@
 ## Objective
 Most cybersecurity data is not a friendly text string. Packets, archives, compiled files, crypto messages and even modern logs can contain arbitrary bytes. You will learn to parse byte sequences without confusing encodings, lengths or endianness.
 
+## Masterclass — complete message parsing versus transport reads
+
+A binary parser receives a **complete** message buffer; a transport receiver must determine where that complete buffer ends. These are separate correctness claims. For a made-up lab frame, use two-byte magic `SC`, one-byte version, one-byte kind, two-byte unsigned big-endian payload size and a bounded UTF-8 JSON object. The header itself is six bytes.
+
+A decoder that merely checks `len(data) >= 6` is unsafe if it then trusts the declared length. Conversely, a TCP receiver that reads `recv(1024)` once may receive only half a frame or several frames joined together. Design and test both layers separately.
+
+| Header `53 43 01 01 00 07` | Interpretation |
+|---|---|
+| `53 43` | ASCII "SC" |
+| `01` | protocol version 1 |
+| `01` | message kind 1 |
+| `00 07` | exactly seven payload bytes |
+
+**Runnable, pure parser with duplicate-field rejection:**
+
+```python
+# MASTERCLASS_RUNNABLE
+import json
+import struct
+
+HEADER = struct.Struct("!2sBBH")
+MAX_PAYLOAD = 256
+
+def unique_keys(pairs):
+    result = {}
+    for name, value in pairs:
+        if name in result:
+            raise ValueError("duplicate JSON field")
+        result[name] = value
+    return result
+
+def reject_nonjson_constant(value):
+    raise ValueError(f"nonstandard JSON constant: {value}")
+
+def parse_frame(data: bytes) -> dict:
+    if type(data) is not bytes or len(data) < HEADER.size:
+        raise ValueError("missing complete header")
+    magic, version, kind, length = HEADER.unpack_from(data)
+    if magic != b"SC" or version != 1 or kind != 1:
+        raise ValueError("unsupported frame")
+    if length > MAX_PAYLOAD or len(data) != HEADER.size + length:
+        raise ValueError("invalid declared length")
+    try:
+        value = json.loads(
+            data[HEADER.size:].decode("utf-8", "strict"),
+            object_pairs_hook=unique_keys,
+            parse_constant=reject_nonjson_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid payload encoding") from exc
+    if type(value) is not dict:
+        raise ValueError("expected an object")
+    return value
+
+payload = b'{"ok":1}'
+good = HEADER.pack(b"SC", 1, 1, len(payload)) + payload
+assert parse_frame(good) == {"ok": 1}
+
+for malformed in (good[:-1], good + b"x", b"XX" + good[2:]):
+    try:
+        parse_frame(malformed)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid frame accepted")
+duplicate = b'{"ok":1,"ok":2}'
+bad = HEADER.pack(b"SC", 1, 1, len(duplicate)) + duplicate
+try:
+    parse_frame(bad)
+except ValueError:
+    pass
+else:
+    raise AssertionError("ambiguous JSON accepted")
+```
+
+**Read the invariants in order.** (1) Check raw type/header length. (2) Verify magic, supported version and kind. (3) Check declared length **and** actual buffer equality. (4) Decode UTF-8 strictly. (5) Reject duplicate JSON keys; some default JSON parsers accept the last value. (6) Require a top-level object. Passing these checks does **not** authenticate who sent the message.
+
+**Exercise:** a sender writes a header then sends payload in three pieces. Sketch `readexactly(6)` followed by `readexactly(length)`, with one overall timeout, peer limits and cancellation. Why does a separate `len(data)` check still belong inside the pure decoder? Because transport and parser are independent trust boundaries, and separate callers may hand in malformed complete buffers.
+
+
 ## 1. Bytes are not characters
 
 `b"A"` stores 0x41 (decimal 65). A Python `str` stores Unicode code points and does not have an inherent wire encoding. UTF-8 represents many characters with multiple bytes.

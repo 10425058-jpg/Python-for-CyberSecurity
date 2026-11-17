@@ -8,6 +8,68 @@
 
 Users log in and request reports. The API must return a report only when the caller is authorized for that **specific report**, not merely authenticated. We will design this with pure Python examples to avoid relying on framework magic.
 
+## Masterclass — authentication, permission, object scope and output encoding are independent checks
+
+**Threat scenario:** an analyst has a valid session and may read organization-level reports in tenant A. A request targets an incident report in tenant B. The session may be valid, the SQL parameter may be safely bound, and the HTTP connection may use TLS—but returning the report is still a broken **object-level authorization** decision.
+
+Build a matrix before coding:
+
+| Caller tenant | Record tenant | Permission | Operation | Expected |
+|---|---|---|---|---|
+| A | A | `report:read` | read | allow |
+| A | B | `report:read` | read | deny |
+| A | A | `report:read` | delete | deny |
+| A | A | `report:delete` | delete | allow after independent safeguards |
+| A | A | none | read | deny |
+
+**Pure decision engine:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Principal:
+    tenant: str
+    subject: str
+    permissions: frozenset[str]
+
+@dataclass(frozen=True)
+class Record:
+    record_id: str
+    tenant: str
+    owner: str
+
+def permitted(principal: Principal, record: Record, operation: str) -> bool:
+    if operation not in {"read", "delete"}:
+        return False
+    if principal.tenant != record.tenant:
+        return False
+    if operation == "delete":
+        return (principal.subject == record.owner
+                and "report:delete" in principal.permissions)
+    return "report:read" in principal.permissions
+
+alice = Principal("A", "alice", frozenset({"report:read"}))
+owner = Principal("A", "alice", frozenset({"report:delete"}))
+foreign = Record("r-9", "B", "bob")
+local = Record("r-1", "A", "alice")
+
+assert permitted(alice, local, "read")
+assert not permitted(alice, foreign, "read")
+assert not permitted(alice, local, "delete")
+assert permitted(owner, local, "delete")
+assert not permitted(owner, foreign, "delete")
+assert not permitted(alice, local, "unknown")
+```
+
+**Reasoning:** the policy checks requested action, tenant boundary, then action-specific rights. It never assumes that "administrator" implies all tenants unless that broader policy was explicitly approved. The demonstration's read rule permits anyone with `report:read` to read a same-tenant report. For *private* documents you must add an owner/classification check. This example is a policy kernel: authentication, resource storage and HTTP request handling remain separate.
+
+**Common wrong defenses:** SQL parameters stop SQL **syntax** injection, not BOLA/IDOR. CORS rules affect what browser scripts may read across origins, not whether a server should authorize the request. Escaping untrusted report titles for HTML protects the rendering sink, not the database query or permission decision. CSRF protection is relevant when browsers automatically attach credentials to state-changing requests; it is not a substitute for permission checks.
+
+**Exercise:** change `permitted` so organization auditors can read organization reports but not private reports, without granting delete rights. Build tests for same-owner, different-owner, same-tenant and cross-tenant. Explain which fields must come from **server-trusted** identity and storage, rather than user-controlled JSON.
+
+
 ## 1. HTTP, state and trust boundaries
 
 A client controls the URL, query parameters, headers and body. Proxies may add headers, but only explicitly trusted proxy infrastructure should influence security context. An application should not accept an arbitrary client-supplied `X-User-Id` as authenticated identity.

@@ -7,6 +7,72 @@
 ## Goal
 Understand what a Python anomaly detector can and cannot prove. You will create a baseline from toy activity counts, compute standardized deviations, and evaluate predictions with a confusion matrix. The core lesson: a statistically unusual event is not automatically malicious.
 
+## Masterclass — how data leakage makes a model look better than it is
+
+A machine-learning detector can report impressive accuracy because the train/test split accidentally includes nearly identical events from the **same actor or campaign** on both sides. When deployment needs to generalize to new hosts, users or future time periods, this evaluation may be misleading. A random split is not automatically the right test protocol for temporal security telemetry.
+
+**Leakage categories to distinguish:**
+- **Identity leakage:** the same entity/event group appears in both train and test.
+- **Temporal leakage:** training features include information that would only become available after the prediction time.
+- **Label leakage:** a feature directly encodes a post-investigation outcome.
+- **Selection bias:** only alerts investigated by humans receive reliable labels.
+
+**Toy scenario:** four authentication rows include multiple events for the same entity. A split that separates individual events without grouping identities puts `alice` in both partitions. That may be fine for predicting *more activity from known users* but is not evidence of generalization to unseen users.
+
+**Runnable validation of dataset partition assumptions:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from datetime import datetime, timezone
+
+rows = [
+    ("alice", "2026-01-01T09:00:00Z", 0),
+    ("bob", "2026-01-01T09:30:00Z", 0),
+    ("alice", "2026-01-02T09:00:00Z", 1),
+    ("carol", "2026-01-02T09:30:00Z", 1),
+]
+
+def identity_overlap(training, testing) -> set[str]:
+    return {r[0] for r in training} & {r[0] for r in testing}
+
+random_style_train = [rows[0], rows[1]]
+random_style_test = [rows[2], rows[3]]
+assert identity_overlap(random_style_train, random_style_test) == {"alice"}
+
+grouped_train = [row for row in rows if row[0] != "alice"]
+grouped_test = [row for row in rows if row[0] == "alice"]
+assert not identity_overlap(grouped_train, grouped_test)
+
+def event_time(row):
+    value = datetime.fromisoformat(row[1].replace("Z", "+00:00"))
+    if value.utcoffset() is None:
+        raise ValueError("timezone required")
+    return value.astimezone(timezone.utc)
+
+assert max(map(event_time, random_style_train)) < min(
+    map(event_time, random_style_test)
+)
+```
+
+**Interpret the result correctly:** the first split is chronological but leaks the identity "alice" across training and testing. The second split avoids identity overlap but is not a clean chronological forecasting split. **Neither split alone answers every deployment question.** Choose a validation strategy based on whether you need future prediction, unseen-entity generalization or both; sometimes group/time constraints must be combined and some data discarded to keep them separate.
+
+**Metrics still need a base rate.** A classifier that always predicts benign can report 99.9% accuracy in a dataset with 0.1% positives but detect **zero** true positives. Use confusion matrices, precision/recall, false positive rate and analyst workload, with stated denominators and confidence in ground truth.
+
+**Independent assignment:** create two different evaluation splits on ten synthetic users over three weeks. Compute identity overlap and temporal overlap, then describe what each split can legitimately claim. Explain why "the model achieved 99% accuracy" is not enough to recommend autonomous account-locking.
+
+
+**Compare splits against the target question:**
+
+| Split policy | Prevents future-to-past leakage? | Prevents same-identity overlap? | Suitable claim |
+|---|---|---|---|
+| random event rows | not guaranteed | no | limited in-sample generalization |
+| chronological cutoff | yes if features respect time | not necessarily | forecast known populations |
+| entity-grouped | not guaranteed | yes | new identity generalization |
+| grouped **and** chronological | by design | by design | stronger test for unseen future entities, with less data |
+
+Even the fourth option needs feature and label audits; a split alone cannot repair biased ground truth.
+
+
 ## 1. Base rates are decisive
 
 Suppose only 1 in 1,000 authentication sessions are truly malicious. A detector with 90% recall and a 5% false-positive rate sounds good, but among 1,000 sessions:

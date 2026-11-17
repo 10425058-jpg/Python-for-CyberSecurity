@@ -4,6 +4,61 @@
 
 **Level:** intermediate · **Estimated study:** 10–14 hours.
 
+## Masterclass — test the wrong implementation, not only the right one
+
+A test suite's green indicator is useful only if its assertions would fail when a meaningful invariant is broken. One way to assess that is **mutation testing**: deliberately introduce a small wrong change, such as replacing `>=` with `>`, and confirm an existing test catches it.
+
+**Specific SOC bug:** the rule "alert on **three or more** unique failures" must alert at exactly three, not four. A test that checks only a count of five will pass both correct and faulty implementations. The equal-to-boundary test is the one that detects the regression.
+
+| Count | Correct rule `>=3` | Mutant rule `>3` | Required test |
+|---|---|---|---|
+| 2 | false | false | below threshold |
+| 3 | true | **false** | exactly at threshold |
+| 4 | true | true | above threshold |
+
+**Executable test-of-a-test:**
+
+```python
+# MASTERCLASS_RUNNABLE
+import unittest
+
+def threshold_reached(count: int, threshold: int = 3) -> bool:
+    if type(count) is not int or count < 0:
+        raise ValueError("invalid count")
+    return count >= threshold
+
+def wrong_mutant(count: int, threshold: int = 3) -> bool:
+    return count > threshold  # deliberately wrong
+
+class RuleTests(unittest.TestCase):
+    def test_below(self):
+        self.assertFalse(threshold_reached(2))
+    def test_exact_boundary(self):
+        self.assertTrue(threshold_reached(3))
+    def test_above(self):
+        self.assertTrue(threshold_reached(4))
+    def test_wrong_type(self):
+        with self.assertRaises(ValueError):
+            threshold_reached(True)
+    def test_mutant_exposed(self):
+        self.assertNotEqual(threshold_reached(3), wrong_mutant(3))
+
+suite = unittest.defaultTestLoader.loadTestsFromTestCase(RuleTests)
+result = unittest.TestResult()
+suite.run(result)
+assert result.wasSuccessful() and result.testsRun == 5
+```
+
+**Why this matters:** security bugs often hide in error paths and boundary behavior, not the success path. Good testing has at least four independent dimensions: input *type*, numerical/string *boundary*, *failure propagation*, and *authorization scope*. Tests that mock away the actual decision function may measure only that the mock was called.
+
+**Limits of this demonstration:** passing five tests is not proof of general correctness. To strengthen it, add property-based input generation and test other mutations (remove type guard; change the threshold; suppress exceptions). For a log ingestion service, add an integration test asserting that a corrupt record after a valid alert cannot overwrite a previous complete report.
+
+**Practice:** Write a threat-based test plan for a CI pipeline that installs dependencies and tests code from outside contributors. Explain why minimizing workflow token permissions, isolating untrusted jobs and avoiding production secrets are as important as the application's unit tests.
+
+
+**Independent exercise (do not copy the answer):** add an authorization rule requiring a matching tenant and a specific read permission. Write a correct implementation and a deliberately broken mutant that omits the tenant check. Build one assertion that would fail for the mutant, then explain why testing only a same-tenant success cannot find a cross-tenant access bug.
+
+
 ## 1. A security tool needs evidence of correctness
 
 "Runs without throwing" is not a meaningful quality guarantee. A defensive detector may silently miss incidents, misread time zones or turn one malformed event into hundreds of false alerts. We need tests for properties and failure modes, not merely for output formatting.

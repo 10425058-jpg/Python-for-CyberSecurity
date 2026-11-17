@@ -4,6 +4,12 @@
 
 > **Safety:** Operate only on systems, traffic and data you own or have explicit written permission to assess. The repository uses synthetic data and loopback-first examples. Tools are educational, not production-hardened scanners or forensic acquisition systems.
 
+## New: Masterclass Quality Pass — every Deep Dive chapter
+
+**All 22 chapters** now include an individually designed *Masterclass* teaching case: a subtle misconception, an explicit causal model, a concrete comparison table, one **standalone, tested Python example**, and an independent transfer exercise. The new examples focus on correctness **and** what the code does not prove. They cover Python type/key collisions, false all-clears, exact sliding-window alert semantics, bounded parsing, SQL rollback, per-object authorization, mutation tests, TaskGroup failure propagation, DNS/SSRF trust, HMAC replay, SOC base rates, timestamp uncertainty, TCP capture gaps, benign high entropy, incomplete cloud inventories, vulnerability applicability, ML leakage and more.
+
+Read the [Deep Dive Masterclass chapters](course/README.md), then complete the corresponding [guided labs](lab-manual/README.md). Review the [editorial quality and verification rubric](reference/EDITORIAL-QUALITY-STANDARD.md).
+
 ## New: complete hands-on learning track
 
 - **[22 guided chapter labs](lab-manual/README.md):** one lab per Deep Dive chapter with runnable code, expected output, failure cases, explanation and grading.

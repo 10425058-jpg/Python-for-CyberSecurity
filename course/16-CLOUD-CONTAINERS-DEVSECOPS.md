@@ -8,6 +8,67 @@
 
 You are given JSON records describing storage buckets, VM instances and workload identities. Your job is to create a **read-only policy report** on resources that violate an organization's configuration baseline. This teaches secure automation without changing production settings.
 
+## Masterclass — compliance reports need three states, not two
+
+Many automation scripts represent every configuration control as `True` or `False`. That loses a crucial distinction: a resource may be **compliant**, **noncompliant**, or **unknown because the inventory is incomplete**. Treating missing data as pass generates an unsafe false all-clear; treating it as confirmed fail can also mislead triage.
+
+**Scenario:** a read-only cloud inventory returns pages 1, 2 and 4, but page 3 fails. The tool successfully evaluated ten known storage resources. Can it declare the entire account compliant? No, even if all ten passed.
+
+| Inventory state | Known control results | Honest conclusion |
+|---|---|---|
+| Complete | all pass | all evaluated resources pass under stated policy |
+| Complete | one fail | at least one evaluated control fails |
+| Incomplete | known resources all pass | **unknown overall** |
+| Incomplete | known failure exists | known failure **plus incomplete coverage** |
+
+**Runnable policy-and-coverage model:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Storage:
+    asset_id: str
+    encrypted: bool
+    public_blocked: bool
+
+@dataclass(frozen=True)
+class Inventory:
+    assets: tuple[Storage, ...]
+    complete: bool
+
+def audit(scan: Inventory) -> dict:
+    failures = []
+    for asset in scan.assets:
+        if type(asset.encrypted) is not bool or type(asset.public_blocked) is not bool:
+            raise ValueError("untrusted storage field")
+        if not asset.encrypted:
+            failures.append((asset.asset_id, "ENCRYPTION"))
+        if not asset.public_blocked:
+            failures.append((asset.asset_id, "PUBLIC_ACCESS"))
+    if type(scan.complete) is not bool:
+        raise ValueError("completeness state must be boolean")
+    overall = ("INCOMPLETE" if not scan.complete
+               else "FAIL" if failures else "PASS")
+    return {"overall": overall, "known_findings": failures}
+
+a = Storage("toy-a", encrypted=True, public_blocked=True)
+b = Storage("toy-b", encrypted=False, public_blocked=True)
+assert audit(Inventory((a,), True))["overall"] == "PASS"
+assert audit(Inventory((a,), False))["overall"] == "INCOMPLETE"
+assert audit(Inventory((a, b), False))["known_findings"] == [
+    ("toy-b", "ENCRYPTION")
+]
+```
+
+**Walkthrough:** evaluation of known assets is a pure function. Inventory completeness is a separate property controlling the overall report. This model intentionally preserves known failures even in incomplete scans, but does not claim the scan has enumerated every noncompliant resource.
+
+**Reality check:** cloud providers differ in encryption defaults, resource-policy inheritance, organization restrictions and effective public access. A synthetic boolean is not enough to prove production compliance. API pagination, rate limits and least-privilege read identities must be documented. A pipeline should never auto-change production configuration based on a toy check; remediation requires independent authority, impact analysis and rollback.
+
+**Exercise:** add the number of successful pages, error pages and last-seen continuation token to the inventory report. Define what "complete" means when the API does not advertise a page count in advance. Then explain how an analyst should report ten clean known assets and one failed inventory region without claiming a clean account.
+
+
 ## 1. Shared responsibility and identity
 
 Cloud providers secure underlying service infrastructure; customers must configure their own identities, networking, data access, application security and monitoring according to the specific service model. Responsibilities differ for IaaS, PaaS and SaaS, and vary by provider.

@@ -15,6 +15,69 @@ Cryptography is a toolbox for specific guarantees:
 
 Different primitives address different goals. Choosing a strong algorithm for the **wrong problem** still produces an insecure system.
 
+## Masterclass — authenticated content can still be a replay
+
+A valid HMAC verifies the message tag under a shared secret. It **does not** prove the sender is a particular user, that the message is fresh, or that the requested action is authorized. A previously authenticated message can be copied and sent again unless your protocol has an explicit replay policy.
+
+**Threat scenario:** a toy service accepts signed event notifications. A valid `event_id` sent twice must not produce two independent security findings. The receiver needs authenticated context, a bounded identity store or persistent index, and a documented replay window.
+
+**Runnable, local HMAC + one-process replay demonstration:**
+
+```python
+# MASTERCLASS_RUNNABLE
+import hashlib
+import hmac
+
+# Fixed test-only key: NEVER embed production key material in source code.
+KEY = b"lab-only-shared-key-not-for-production"
+PURPOSE = b"soc-event:v1:"
+
+def tag(payload: bytes) -> bytes:
+    return hmac.new(KEY, PURPOSE + payload, hashlib.sha256).digest()
+
+def check_event(payload: bytes, signature: bytes, seen: set[bytes]) -> bool:
+    if type(payload) is not bytes or len(payload) > 512:
+        raise ValueError("invalid payload size")
+    if type(signature) is not bytes or len(signature) != 32:
+        raise ValueError("invalid HMAC size")
+    if not hmac.compare_digest(tag(payload), signature):
+        return False
+    event_identity = hashlib.sha256(PURPOSE + payload).digest()
+    if event_identity in seen:
+        return False  # replay, not a new event
+    if len(seen) >= 100:
+        raise ValueError("replay store full; no silent success")
+    seen.add(event_identity)
+    return True
+
+message = b"event=lab-001"
+signature = tag(message)
+observed: set[bytes] = set()
+assert check_event(message, signature, observed)
+assert not check_event(message, signature, observed)
+assert not check_event(b"event=lab-002", signature, observed)
+assert len(observed) == 1
+```
+
+**Explain the protections and what they miss.** The `PURPOSE` prefix separates one class of signed messages from another. `compare_digest` performs a verification comparison suitable for MACs; it does not manage key lifecycle. The replay set is bounded to 100 entries, but it is lost after a restart and uses payload hashes rather than authoritative event IDs. A real message protocol must authenticate an unambiguous structured encoding, define sequence/nonce or timestamp semantics, store replay state durably when necessary, and protect keys with approved services. Do not invent a production cryptographic protocol from this demonstration.
+
+**Connect to previous lessons:** a plain SHA-256 digest of a file can help compare bytes against a trusted reference, but it cannot prove who produced them. HMAC authenticates among holders of one shared key, but it cannot prove which holder. AEAD provides confidentiality and integrity only under correct nonce/key usage. None of these establishes authorization to read another user's incident report.
+
+**Deep exercise:** Does using a timestamp alone prevent replay? Not reliably: clocks drift and messages may be re-sent inside a permitted tolerance. Compare a unique event ID plus durable dedup storage, a monotonic sequence, and a bounded timestamp window. State the operational costs and failure policy for each.
+
+
+**Causal comparison table:**
+
+| Input and state | HMAC valid? | Seen before? | Accepted as new event? |
+|---|---|---|---|
+| original signed message | yes | no | yes |
+| identical replay | yes | yes | no |
+| modified payload with original tag | no | no | no |
+| signed message for an unauthorized tenant | may be yes | no | **must still be denied** by separate authorization |
+
+The last row is outside the toy code's permission model; it explains why authentication of content does not grant resource access.
+
+
 ## 1. Hashing versus encryption
 
 A cryptographic hash such as SHA-256 maps arbitrary-length bytes to a fixed 256-bit digest. It cannot be decrypted. A hash can help detect file changes when compared against a trustworthy expected digest. Hashes are not proof of authorship, and unsalted fast hashes are not suitable for password storage.

@@ -7,6 +7,60 @@
 ## Goal
 Use Python's regular expressions to extract structured fields from *bounded* text, understand greedy versus lazy matches, identify when regex is the wrong parser, and avoid expensive patterns on adversarial input.
 
+## Masterclass — lexical validity, semantic validity and authorization are separate
+
+A regular expression can recognize a string *shape*. It cannot prove that the string describes a real calendar date, an authorized network destination or a truthful log message. When processing hostile input, choose a bounded lexical grammar, then call semantic validators and finally apply a separate permission rule.
+
+**A common trap:** `\d` matches Unicode decimal digits in Python's default Unicode-aware regexes. A protocol requiring ASCII digits should use `[0-9]`, or explicit ASCII mode, instead. Another trap: `re.search` accepts a valid substring inside a longer invalid input; `re.fullmatch` requires the whole string to conform.
+
+| Input | `search("[0-9]+")` | `fullmatch("[0-9]+")` | Valid ASCII port? |
+|---|---|---|---|
+| `"443"` | match | match | yes |
+| `"443junk"` | match | no | no |
+| `"0"` | match | match | no (range) |
+| `"65536"` | match | match | no (range) |
+| `"４４３"` | no ASCII match | no | no |
+
+**Runnable grammar + semantics, without a network target:**
+
+```python
+# MASTERCLASS_RUNNABLE
+import re
+
+PORT_GRAMMAR = re.compile(r"[0-9]{1,5}")
+
+def parse_port(raw: str) -> int:
+    if type(raw) is not str or len(raw) > 5:
+        raise ValueError("invalid input type or length")
+    if PORT_GRAMMAR.fullmatch(raw) is None:
+        raise ValueError("expected ASCII decimal digits")
+    number = int(raw)
+    if not 1 <= number <= 65535:
+        raise ValueError("port outside valid range")
+    return number
+
+assert parse_port("443") == 443
+assert re.search(r"[0-9]+", "443junk") is not None
+assert re.fullmatch(r"[0-9]+", "443junk") is None
+assert re.fullmatch(r"\d+", "４４３") is not None  # Unicode digits
+assert PORT_GRAMMAR.fullmatch("４４３") is None
+
+for bad in ("443junk", "0", "65536", "-1", "４４３", ""):
+    try:
+        parse_port(bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"bad port accepted: {bad!r}")
+```
+
+**Two-stage reasoning:** the regex checks the permitted characters and count; the numeric conversion checks port semantics. Even if a caller enters "443" correctly, this function does **not** authorize connecting to any remote service or establish that the destination is safe.
+
+**ReDoS risk:** an unsafe pattern containing ambiguous nested repetitions can take disproportionate CPU time for carefully chosen inputs. Avoid unbounded text before matching, use constrained expressions, and prefer real parsers for JSON/CSV/HTML/XML. A byte cap belongs **before decoding** if the input originates as raw bytes. A character cap after decoding is not sufficient to bound upstream allocations.
+
+**Exercise:** design a toy auth log parser using `re.fullmatch`, then validate the extracted timestamp with an aware `datetime` parser, the optional IP address with `ipaddress.ip_address`, and the actor against a documented identity schema. List three inputs that pass the regex but should still fail semantic or authorization checks.
+
+
 ## 1. Raw strings and regex syntax
 
 Python's `re` module defines a regular-expression language:

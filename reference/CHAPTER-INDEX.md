@@ -2,6 +2,12 @@
 
 > **The expanded third-edition course has its own comprehensive index:** [22 deep-dive lessons with annotated code and worked exercises](../course/README.md). The chapters below are quick-reference companions, not the main long-form lessons.
 
+## Pedagogical quality upgrade
+
+- [All 22 Deep Dive masterclasses](../course/README.md) focus on difficult misconceptions, real failure paths and testable reasoning.
+- [Masterclass editorial review criteria](EDITORIAL-QUALITY-STANDARD.md): learning outcomes, explanation, contrasting cases, independent tasks and validation.
+- [Runnable masterclass regression suite](../tests/test_masterclass_chapters.py): executes one new standalone exercise for each chapter.
+
 ## Part I — Programming foundations (12 chapters)
 | Chapter | Key competencies | Practice artifact |
 |---|---|---|

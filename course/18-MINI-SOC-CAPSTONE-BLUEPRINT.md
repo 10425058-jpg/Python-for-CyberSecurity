@@ -4,6 +4,66 @@
 
 **Level:** advanced project · **Estimated build:** 6–12+ weeks at 10 hours/week, depending on prior experience.
 
+## Masterclass — define success by observable failure behavior
+
+An impressive Mini-SOC demo can still be unsafe if it prints an alert from the first three records and silently stops at a corrupt fourth record. **A correct result needs a completion contract:** either all requested input was processed under a stated policy or the output is marked incomplete and must not replace a previously certified report.
+
+**Acceptance contract:** input is synthetic JSONL, event IDs are source-qualified, event-time order is documented, alert evidence is preserved, write operations are staged, and the exit status is nonzero when source parsing fails.
+
+| Scenario | Should previous complete report survive? | What the CLI should report |
+|---|---|---|
+| three valid failures | new complete report may replace | complete, review alert(s) |
+| malformed fourth record | yes | incomplete ingest, nonzero |
+| out-of-order timestamp | yes | rejected ordering or documented late policy |
+| duplicate event ID | deterministic handling | dedup count and evidence |
+| disk failure | best effort preserve previous report | incomplete and actionable error |
+
+**Runnable end-to-end acceptance test using the repository's existing mini-SOC:**
+
+```python
+# MASTERCLASS_RUNNABLE
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from examples.mini_soc_pipeline import write_findings_atomic
+
+def record(i: int) -> bytes:
+    item = {
+        "source": "lab-idp",
+        "event_id": f"event-{i}",
+        "timestamp": f"2026-01-01T10:0{i}:00Z",
+        "actor": "alex",
+        "action": "login_failure",
+    }
+    return (json.dumps(item) + "\n").encode("utf-8")
+
+with TemporaryDirectory() as td:
+    root = Path(td)
+    source = root / "synthetic.jsonl"
+    output = root / "report.jsonl"
+    output.write_text("PRIOR_COMPLETE_REPORT\n", encoding="utf-8")
+    source.write_bytes(b"".join(record(i) for i in range(3)) + b"{broken\n")
+    try:
+        write_findings_atomic(source, output, threshold=3)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("corrupt source accepted")
+    assert output.read_text(encoding="utf-8") == "PRIOR_COMPLETE_REPORT\n"
+
+    source.write_bytes(b"".join(record(i) for i in range(3)))
+    assert write_findings_atomic(source, output, threshold=3) == 1
+    new_report = json.loads(output.read_text(encoding="utf-8").strip())
+    assert new_report["classification"] == "review"
+```
+
+**Explain the causal path:** three valid login failures trigger one *review candidate*. The corrupt fourth record causes the input reader to raise. The output adapter stages the report separately, so the old complete report is not overwritten. A later all-valid run commits a new complete file. This tests **failure semantics**, not incident attribution, source truth or resilience against arbitrary filesystem races/power loss.
+
+**Project engineering bridge:** use separate adapters for schema validation, normalization, source/provenance, deduplication, detection, evaluation and report storage. Every stage should have a typed input/output contract and a clear "incomplete" behavior. Measure memory cardinality, threshold edge cases, source gaps and analyst false positives before connecting a real system.
+
+**Graduation question:** What happens if a disk becomes full after one alert has been staged? What test would demonstrate the old report is preserved? Explain how the answer differs between atomic filesystem replacement, SQLite transaction commit and a remote notification system with at-least-once delivery.
+
+
 ## 0. Project objective
 
 Build an offline **defensive** mini Security Operations Center pipeline that ingests synthetic JSONL events, validates schemas, normalizes timestamps, preserves provenance, correlates failed-login events over windows, emits explainable *review* alerts and measures quality against labeled data.

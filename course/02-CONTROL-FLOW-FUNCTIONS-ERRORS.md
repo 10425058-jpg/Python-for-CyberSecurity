@@ -7,6 +7,71 @@
 ## Learning goals
 Design a script that clearly separates parsing, validation, decision-making and output. Understand branches, loops, scoping, call signatures, exceptions, generators, and the difference between returning an error and printing a message.
 
+## Masterclass — failure states are part of a security API
+
+**Mental model.** A detector can return zero findings for two very different reasons: every requested record was processed and none matched, or parsing failed before the suspicious records were examined. A result type must represent **completeness**, not just a number.
+
+Imagine three records: valid failure, valid success, malformed JSON. Catching the third error and returning `{"failures": 1}` looks useful but hides the possibility that later evidence was never processed. This is a partial result and **must be labeled as such**.
+
+| Input | Accepted? | Complete? | Should report "all clear"? |
+|---|---|---|---|
+| valid, valid | yes | yes | only if the rule finds zero |
+| empty but valid file | yes | yes | zero findings, not "no incidents anywhere" |
+| valid, corrupt | partially | no | **never** |
+| missing source file | no | no | **never** |
+
+**Runnable lab — explicit result semantics:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+import json
+
+@dataclass(frozen=True)
+class ScanResult:
+    complete: bool
+    processed: int
+    failures: int
+    error_line: int | None
+
+def scan(lines: list[str]) -> ScanResult:
+    processed = 0
+    failures = 0
+    for number, raw in enumerate(lines, 1):
+        if type(raw) is not str or len(raw) > 1024:
+            return ScanResult(False, processed, failures, number)
+        try:
+            item = json.loads(raw)
+        except json.JSONDecodeError:
+            return ScanResult(False, processed, failures, number)
+        if type(item) is not dict or set(item) != {"action"}:
+            return ScanResult(False, processed, failures, number)
+        if item["action"] not in ("login_failure", "login_success"):
+            return ScanResult(False, processed, failures, number)
+        processed += 1
+        failures += item["action"] == "login_failure"
+    return ScanResult(True, processed, failures, None)
+
+clean = scan(['{"action":"login_success"}'])
+broken = scan(['{"action":"login_failure"}', "{bad json"])
+assert clean == ScanResult(True, 1, 0, None)
+assert broken == ScanResult(False, 1, 1, 2)
+assert not broken.complete and broken.error_line == 2
+
+def may_publish_all_clear(result: ScanResult) -> bool:
+    return result.complete and result.failures == 0
+
+assert may_publish_all_clear(clean)
+assert not may_publish_all_clear(broken)
+```
+
+**Step-by-step:** The function never discards its error state. `processed` includes only validated events, `failures` counts a subset of those, and `complete` is true only when the input ends without validation errors. The caller's logic checks `complete` **before** publishing the "all clear" status. This matters more than catching and printing a traceback. The toy function caps individual text records but not list size; a production streaming reader must also enforce total byte/record limits.
+
+**Why this API shape?** An exception-first design can be equally correct if exceptions propagate to an exit code and previously staged reports are not committed. A result object is useful for a batch UI that must show partial progress while still refusing to certify the input.
+
+**Your turn:** Modify the example to include `rejected_count` and a `source_id` without logging raw records. Then write tests for (a) an invalid type, (b) an empty valid collection, (c) a malformed third record, and (d) a consumer that refuses to publish findings after `complete=False`. **Review question:** if you choose to quarantine and continue, what metric prevents a data-loss incident being hidden?
+
+
 ## 1. Branches and short-circuit evaluation
 
 A boolean expression can skip the right operand. For example, `a and b` evaluates `b` only if `a` is truthy; `a or b` evaluates `b` only if `a` is falsy. This can avoid expensive or unsafe operations **only if the left condition is correctly designed**.

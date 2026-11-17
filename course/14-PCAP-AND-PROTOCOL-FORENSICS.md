@@ -7,6 +7,65 @@
 ## Learning outcome
 Inspect offline packet captures, extract bounded metadata, reconstruct basic flow statistics, understand why encrypted or lost data limits conclusions, and write a report that does not exaggerate what a capture proves.
 
+## Masterclass — packets, TCP segments and application messages are different counting units
+
+A PCAP can contain retransmitted TCP segments, missing frames, overlapping data and traffic captured only mid-connection. Counting the total payload length of every observed packet can therefore **overestimate application bytes**. Meanwhile, a capture with gaps may be unable to reconstruct a complete request.
+
+To study the idea without external traffic or parser dependencies, use synthetic sequence-offset fragments. This toy logic handles only exact duplicates and simple gaps; **it is not** a real TCP reassembly engine.
+
+| Offset | Payload | Interpretation |
+|---|---|---|
+| 0 | `ABC` | first three bytes |
+| 0 | `ABC` | exact retransmission |
+| 3 | `DEF` | next three bytes |
+| 9 | `X` | gap at byte offsets 6–8 |
+
+**Runnable offline stream sketch:**
+
+```python
+# MASTERCLASS_RUNNABLE
+def summarize_fragments(parts: list[tuple[int, bytes]]):
+    seen: dict[int, bytes] = {}
+    duplicates = 0
+    for offset, payload in parts:
+        if type(offset) is not int or offset < 0:
+            raise ValueError("invalid sequence offset")
+        if type(payload) is not bytes or not payload or len(payload) > 1024:
+            raise ValueError("invalid fragment")
+        if offset in seen:
+            if seen[offset] != payload:
+                raise ValueError("conflicting fragment at same offset")
+            duplicates += 1
+        else:
+            seen[offset] = payload
+    gaps = []
+    expected = 0
+    for offset, payload in sorted(seen.items()):
+        if offset > expected:
+            gaps.append((expected, offset))
+        elif offset < expected:
+            raise ValueError("partial overlap needs full TCP reassembly")
+        expected = offset + len(payload)
+    return {"segments": len(seen), "retransmits": duplicates, "gaps": gaps}
+
+parts = [(0, b"ABC"), (0, b"ABC"), (3, b"DEF"), (9, b"X")]
+report = summarize_fragments(parts)
+assert report == {"segments": 3, "retransmits": 1, "gaps": [(6, 9)]}
+try:
+    summarize_fragments([(0, b"ABC"), (0, b"XYZ")])
+except ValueError:
+    pass
+else:
+    raise AssertionError("conflicting content silently accepted")
+```
+
+**Read the output carefully:** the report says there are three distinct offset fragments, one exact duplicate and one missing byte interval. It does **not** say there was one HTTP request, a complete TCP connection or a malicious transfer. Real TCP sequence numbers can wrap, packets can arrive out of order, overlaps and fragmentation have complicated semantics, and capture loss may occur before the file is written.
+
+**Operational bridge:** when analyzing an owned offline PCAP with Scapy or Wireshark, log the link-layer type, capture filters, timestamps, missing segments and what was actually observed. TLS usually encrypts application bodies; metadata may remain visible without allowing content interpretation.
+
+**Challenge:** inject a fragment at offset 2 that overlaps existing bytes. Should the toy parser select first-seen or last-seen content? Neither is universally safe; this snippet intentionally **rejects** an ambiguous overlap. Explain why real forensic analysis needs a documented target-stack/reassembly policy and why different tools can disagree.
+
+
 ## 1. A packet capture is evidence, not ground truth
 
 PCAP/PCAPNG files record captured packets and timestamps. Capture quality depends on interface, filter, buffer, link type, packet truncation (snap length), clock and network path. Some traffic may never appear in the file. A tool must not assume that all conversations are complete.

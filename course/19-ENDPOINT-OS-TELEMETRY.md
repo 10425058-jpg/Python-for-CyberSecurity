@@ -7,6 +7,71 @@
 ## Goal
 Understand how operating systems represent activity, which logs are reliable for specific questions, and how Python can normalize *approved, exported* system events. Work with synthetic data rather than gathering privileged logs from other people's machines.
 
+## Masterclass — an event ID has no global meaning without a provider
+
+Security engineers frequently see a number such as "Event ID 1" and assume it has one meaning across all Windows, Linux and endpoint agent logs. In reality, the interpretation depends on the **provider/channel/schema/version** and the exact fields. A normalized event type is a derived assertion, not original evidence.
+
+**Toy example:** two invented providers both emit numeric ID `1001`. In provider A it means a login failure; in provider B it means a routine maintenance action. A parser keyed only by ID incorrectly produces a security alert for both.
+
+| Provider | Numeric ID | Defined toy meaning | Safe normalized type |
+|---|---:|---|---|
+| lab-auth | 1001 | failed login | `authentication_failure` |
+| lab-maintenance | 1001 | scheduled update | `maintenance_event` |
+| unknown provider | 1001 | unknown | reject or mark unknown |
+
+**Runnable source-aware normalization:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+
+EVENT_MAP = {
+    ("lab-auth", "security", 1001): "authentication_failure",
+    ("lab-maintenance", "operations", 1001): "maintenance_event",
+}
+
+@dataclass(frozen=True)
+class EndpointEvent:
+    provider: str
+    channel: str
+    event_id: int
+    host: str
+
+def normalize(row: EndpointEvent) -> dict:
+    if type(row.event_id) is not int:
+        raise ValueError("numeric event ID required")
+    kind = EVENT_MAP.get((row.provider, row.channel, row.event_id))
+    if kind is None:
+        raise ValueError("unsupported provider/channel/event ID")
+    if type(row.host) is not str or not row.host:
+        raise ValueError("host required")
+    return {
+        "normalized_type": kind,
+        "provider": row.provider,
+        "channel": row.channel,
+        "event_id": row.event_id,
+        "host": row.host,
+    }
+
+failed = normalize(EndpointEvent("lab-auth", "security", 1001, "vm-a"))
+updated = normalize(EndpointEvent("lab-maintenance", "operations", 1001, "vm-b"))
+assert failed["normalized_type"] == "authentication_failure"
+assert updated["normalized_type"] == "maintenance_event"
+try:
+    normalize(EndpointEvent("unknown", "security", 1001, "vm-c"))
+except ValueError:
+    pass
+else:
+    raise AssertionError("unknown provider silently mapped")
+```
+
+**Reason through why context matters.** The code consults the full provider/channel/event tuple before creating a normalized type. It preserves original metadata so an analyst can cross-check the mapping. These IDs are **invented for learning** and do not assert any specific Microsoft or Linux event code meanings.
+
+**Further constraints:** PIDs are reused, log messages can include attacker-controlled text, time stamps can be skewed, and event channels may be unavailable due to permissions/retention settings. A process tree without process creation time/provider identity can mislead. Real endpoint collection should follow legal access scope, minimize privacy exposure and protect command-line/secret fields.
+
+**Exercise:** add two source-specific mappings for process start and service changes, then write a test proving that an unknown Windows provider ID cannot be interpreted as a Linux event. Report both a normalized UTC time and the original source string without silently assuming missing offsets.
+
+
 ## 1. Linux processes, identities and permissions
 
 A Linux process has a PID and credentials (UID/GID and related security context). File permissions can be represented by owner/group/other modes and ACLs; security modules such as SELinux/AppArmor can impose further controls. Root or broad capabilities can do far more than a normal process.

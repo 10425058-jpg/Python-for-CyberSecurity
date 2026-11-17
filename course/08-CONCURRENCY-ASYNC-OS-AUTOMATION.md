@@ -7,6 +7,70 @@
 ## Scenario
 You must perform approved health checks against a list of services on **your own lab machine**, but you need to avoid overwhelming it. You also want to inventory files and run fixed subprocess commands. This requires knowledge of CPU vs I/O work, cancellation, timeouts, privileges and race conditions.
 
+## Masterclass — bounded concurrency and correct failure propagation
+
+**Deep idea:** rate-limiting *active* workers is not enough if you create 100,000 pending tasks in memory. Backpressure means the producer must stop enqueueing when a bounded queue is full. Moreover, when a worker fails, the system must cancel its siblings and producer rather than hang forever waiting on `queue.join()`.
+
+In Python 3.11+, `asyncio.TaskGroup` creates a structured lifetime for related tasks. If a worker raises a non-cancellation exception, the task group cancels the others and reports an `ExceptionGroup`. This is a better base for a fail-fast pipeline than manually gathering tasks and swallowing exceptions.
+
+**Runnable offline example (no sockets, only synthetic integers):**
+
+```python
+# MASTERCLASS_RUNNABLE
+import asyncio
+
+async def transform(value: int) -> int:
+    await asyncio.sleep(0)  # yield control; no network call
+    if type(value) is not int or value < 0:
+        raise ValueError("invalid synthetic task")
+    return value * value
+
+async def process(items: list[int], workers: int = 3) -> list[int]:
+    if type(workers) is not int or not 1 <= workers <= 8:
+        raise ValueError("invalid workers")
+    queue = asyncio.Queue(maxsize=4)
+    results: list[int | None] = [None] * len(items)
+
+    async def producer():
+        for index, value in enumerate(items):
+            await queue.put((index, value))
+        for _ in range(workers):
+            await queue.put(None)
+
+    async def consumer():
+        while True:
+            work = await queue.get()
+            try:
+                if work is None:
+                    return
+                index, value = work
+                results[index] = await transform(value)
+            finally:
+                queue.task_done()
+
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(producer())
+        for _ in range(workers):
+            tg.create_task(consumer())
+    return [v for v in results if v is not None]
+
+assert asyncio.run(process([1, 2, 3, 4])) == [1, 4, 9, 16]
+failed = False
+try:
+    asyncio.run(process([1, -1, 2]))
+except* ValueError as errors:
+    failed = True
+    assert any("invalid synthetic task" in str(e) for e in errors.exceptions)
+assert failed
+```
+
+**Trace the two paths.** For valid input, the producer fills at most four queued entries, three workers transform items, and one sentinel per worker ends consumption. Results preserve input order using the index, irrespective of scheduling. For an invalid item, `transform` raises; `TaskGroup` propagates the error and cancels other tasks. There is no `queue.join()` call that could wait indefinitely after the consumer died.
+
+**What this does *not* bound:** the input list and result list are still O(N) memory. A truly streaming collector must limit the entire pipeline—including output retention, task count, open sockets and retries—and use a designed cancellation/flush policy. A bounded queue is only one resource control.
+
+**Your challenge:** change the producer to receive an async generator with 100,000 records, then write results to a staged local file without retaining all records. Describe what happens if disk writes fail after processing an alert. How will you signal incomplete output and ensure cleanup? Do not hide `CancelledError` or substitute `except Exception: pass`.
+
+
 ## 1. Concurrency versus parallelism
 
 - **Concurrency:** multiple tasks can make progress over a period of time by interleaving work.
