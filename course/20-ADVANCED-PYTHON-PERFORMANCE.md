@@ -158,3 +158,103 @@ Operational safeguards:
 **Answer checks:** for (2), only the streaming *data path* stays bounded; for (4), tenant and permission context must be part of cache semantics; for (6), measure, do not assume speedups.
 
 **References:** [Python data model](https://docs.python.org/3/reference/datamodel.html), [dis](https://docs.python.org/3/library/dis.html), [tracemalloc](https://docs.python.org/3/library/tracemalloc.html), [pickle warning](https://docs.python.org/3/library/pickle.html).
+
+
+## 10. Advanced runtime investigation: cache correctness and tenant isolation
+
+Caching is a performance optimization, not a security control. A cache that keys only by report ID can leak cross-tenant data if distinct tenants use the same ID.
+
+### Wrong and right cache keys
+
+```python
+from functools import lru_cache
+
+# Demonstration only: cache is a process-local store.
+REPORTS = {
+    ("tenant-a", "r-1"): "A: private",
+    ("tenant-b", "r-1"): "B: private",
+}
+
+@lru_cache(maxsize=128)
+def load_report(tenant: str, report_id: str) -> str:
+    return REPORTS[(tenant, report_id)]
+
+assert load_report("tenant-a", "r-1") == "A: private"
+assert load_report("tenant-b", "r-1") == "B: private"
+```
+
+**Why both arguments matter:** `lru_cache` uses function arguments in its cache key. Removing `tenant` would let one cached report collide with another tenant's record ID. In production, the authorization context, permission version, revocation and data updates are also crucial. A cached authorized result may outlive the permission that originally allowed it.
+
+### Invalidating caches under changing policy
+- Do not cache sensitive authorization outcomes without a defined TTL, revocation mechanism and principal/tenant-specific key.
+- Prefer caching immutable, permission-independent calculations.
+- Measure the benefit; a cache can increase memory usage and stale-data risk.
+- Include schema or policy version in cache semantics when changing rules.
+
+## 11. Profiling: CPU time is not memory use
+
+`time.perf_counter` measures wall time. `cProfile` measures where Python time is spent. `tracemalloc` tracks Python-managed allocations, not necessarily all native allocation or RSS. To compare algorithms, keep inputs and environment controlled.
+
+```python
+import tracemalloc
+from collections import Counter
+
+events = ["alex" if i % 2 else "sam" for i in range(100_000)]
+tracemalloc.start()
+counts = Counter(events)
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+assert counts["alex"] == 50_000
+assert counts["sam"] == 50_000
+print("observed Python allocation peak:", peak)
+```
+
+**Measurement limitation:** the `events` list was allocated *before* `tracemalloc.start()`, so the reported peak excludes that input construction. To compare eager versus streaming fairly, begin tracing before each complete workload and control retention.
+
+### Common performance traps in Python security tools
+
+| Mistake | Effect | Improvement |
+|---|---|---|
+| `readlines()` on 20 GB log | huge memory | stream bounded records |
+| global `list` of every alert | memory growth | stage to file/DB |
+| quadratic nested joins | O(N²) time | indexed maps or SQL join |
+| unlimited futures/coroutines | socket/task exhaustion | bounded work queue |
+| `lru_cache` without context | stale cross-tenant data | scoped keys and invalidation |
+| unbounded regex | CPU exhaustion | strict grammars and limits |
+| processing all files as root | huge blast radius | least-privilege identity |
+
+## 12. Generators, finalizers and resource lifetimes
+
+A generator suspended at `yield` may retain an open file descriptor until iteration is finished or the generator is explicitly closed. Do not rely solely on garbage collection for timely cleanup.
+
+```python
+from contextlib import closing
+
+def numbers():
+    try:
+        for n in range(100):
+            yield n
+    finally:
+        print("generator cleanup")
+
+with closing(numbers()) as generator:
+    assert next(generator) == 0
+```
+
+A generator handling an open socket or file needs an explicit lifecycle if a consumer can stop early. In complex systems prefer a context manager that owns the resource and exposes an iterator.
+
+## 13. Exercises and answer checks
+
+**A:** Profile 100,000 rows parsed into a list versus streamed into a Counter. Compare *end-to-end* peak memory (including data construction).
+
+**B:** Create a cache whose key omits a tenant; demonstrate the incorrect result on toy records, then fix and add a regression test. Keep this exercise entirely local.
+
+**C:** Explain why `sys.getsizeof(dict)` undercounts memory of values and nested objects; inspect `tracemalloc` and OS RSS.
+
+**D:** Use `dis.dis` on `counter += 1`. Why does its bytecode form not establish cross-thread atomicity? Runtime/build and scheduling semantics matter.
+
+**E:** Design bounded cancellation and cleanup for a long-running event consumer; provide a test showing no open resources after early stop.
+
+**F:** Explain why loading a Python package from an untrusted source can execute code even if the function you intend to use looks harmless. Review build hooks, import-time effects and package provenance.
+
+**Review:** a 2× speedup that skips validation or loses errors is not an improvement. Performance requirements include accuracy, completeness and resource safety.

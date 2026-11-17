@@ -130,3 +130,92 @@ Keep adapters read-only and isolate any platform-specific package from the pure 
 - What are the privacy risks of collecting process command lines?
 
 **References:** [Microsoft Windows Event Logging](https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging), [systemd journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html), [Python platform](https://docs.python.org/3/library/platform.html).
+
+
+## 10. Detailed endpoint normalization: same event type, different sources
+
+Windows Event Logs, Sysmon, Linux journald and application logs have different schemas. A robust Python detector should separate **source-specific parsing** from **normalized correlation**, while keeping raw references and original semantics.
+
+### Two toy records
+
+```json
+{"provider":"toy-linux-auth","host":"lab-linux","timestamp":"2026-01-01T10:00:00Z","message":"login failure","principal":"alex"}
+{"provider":"toy-windows-auth","host":"lab-win","timestamp":"2026-01-01T10:00:01Z","event_id":1001,"principal":"alex"}
+```
+
+**Do not assume** Windows event ID 1001 means a login failure in every provider. In this invented toy provider only, we define that meaning. For real records, event ID must be interpreted together with provider/channel/version and event data.
+
+### Safe normalizer for an invented schema
+
+```python
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
+@dataclass(frozen=True)
+class NormalizedEvent:
+    timestamp_utc: datetime
+    host: str
+    principal: str
+    event_type: str
+    provider: str
+
+def normalize_toy_event(row: dict) -> NormalizedEvent:
+    provider = row.get("provider")
+    if provider not in ("toy-linux-auth", "toy-windows-auth"):
+        raise ValueError("unrecognized provider")
+    host, principal = row.get("host"), row.get("principal")
+    if type(host) is not str or not 1 <= len(host) <= 128:
+        raise ValueError("invalid host")
+    if type(principal) is not str or not 1 <= len(principal) <= 128:
+        raise ValueError("invalid principal")
+    raw_time = row.get("timestamp")
+    if type(raw_time) is not str or len(raw_time) > 64:
+        raise ValueError("bad timestamp")
+    dt = datetime.fromisoformat(raw_time.replace("Z","+00:00"))
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise ValueError("timezone required")
+    if provider == "toy-linux-auth":
+        if row.get("message") != "login failure":
+            raise ValueError("unexpected Linux event")
+    else:
+        if type(row.get("event_id")) is not int or row["event_id"] != 1001:
+            raise ValueError("unexpected Windows toy event")
+    return NormalizedEvent(
+        dt.astimezone(timezone.utc), host, principal,
+        "authentication_failure", provider
+    )
+
+toy = {"provider":"toy-windows-auth","host":"lab-win",
+       "timestamp":"2026-01-01T10:00:01Z","event_id":1001,"principal":"alex"}
+assert normalize_toy_event(toy).event_type == "authentication_failure"
+```
+
+This parser is intentionally limited to the **invented** schemas above. Real Windows/Linux event formats require maintained adapters, permissions, version awareness and protected original records. Production code must cap total record size before parsing.
+
+## 11. Correlation pitfalls by operating system
+
+| Detail | Why it matters |
+|---|---|
+| PID reuse | process ID alone is not stable identity |
+| Linux `ctime` | metadata change, not reliably creation |
+| Windows provider + event ID | ID meaning varies by provider/channel |
+| Host clock skew | event order may be wrong |
+| Missing endpoint agent | coverage gap; no evidence is not clean system |
+| Process command line | can contain credentials/private data |
+| Admin or root privilege | may be unnecessary for read-only subset |
+| Script-block logging | content may carry secrets and sensitive source |
+
+### Example hypothesis and alternatives
+
+An endpoint reports "new service installed" followed by unusual network connections. Legitimate explanations include software updates, enterprise management tools and authorized deployment. Do not label it persistence without corroborating package inventory, approval records, parent process, account identity and timestamps.
+
+## 12. Exercises
+
+1. Normalize ten synthetic Windows/Linux events into one schema with UTC and original references.
+2. Add a test rejecting an unknown provider or wrong event ID.
+3. Demonstrate PID reuse in synthetic data, and propose `(host,pid,process_start_time)` as a more stable composite key.
+4. Compare read-only collection permissions for Linux journal and Windows event channels in your *own* VM.
+5. Write a privacy policy for command line and environment variable collection.
+6. Develop a response playbook: detect, verify sources, correlate, escalate with human approval, and retain evidence.
+
+**Model answer:** normalized event type is a *derived assertion* based on a source-specific mapping. It should not erase the original event ID, channel, provider or record reference.
