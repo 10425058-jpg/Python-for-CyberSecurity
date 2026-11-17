@@ -285,6 +285,264 @@ print("D02-E: benchmark outcome is measurement, not proof")
 **Challenge:** Compare `needle in list(range(N))` against `needle in set(range(N))`. If you construct the set *inside* the timed test, are you measuring set lookup or the full cost of building the index? Explain the tradeoff.
 
 
+
+## 2.12 Deep Core VI — Trees and graphs: represent relationships
+
+A **tree** is a connected acyclic graph with a designated root in many applications. A **graph** contains vertices (nodes) and edges (relationships); it may be directed or undirected, weighted or unweighted, cyclic or acyclic. An *adjacency list* stores neighbors for each node; for a sparse graph, it commonly uses O(V+E) space rather than an O(V²) adjacency matrix.
+
+Cybersecurity analogies: a filesystem directory hierarchy is tree-like but symbolic links can introduce cycles and cross-boundary edges. An asset dependency graph models software relationships; an identity/role graph models access edges. The representation alone does not make a trust decision—missing or fabricated edges are a data quality problem.
+
+**Breadth-first search (BFS)** explores vertices in increasing number of edges from the start when all edges have equal cost. It uses a FIFO queue. **Depth-first search (DFS)** explores along one path before backtracking and uses a stack (or recursion). Always track `visited` in cyclic graphs.
+
+```python
+# DEEP_CORE_RUNNABLE
+from collections import deque
+
+TOY = {
+    "gateway": ("web", "database"),
+    "web": ("app",),
+    "database": (),
+    "app": ("gateway",),  # cycle for visited-set demonstration
+}
+
+def bfs(start: str, graph: dict[str, tuple[str, ...]], max_nodes=20) -> list[str]:
+    if start not in graph or type(max_nodes) is not int or max_nodes < 1:
+        raise ValueError("invalid start or cap")
+    queue = deque([start])
+    visited = {start}
+    order = []
+    while queue:
+        node = queue.popleft()
+        order.append(node)
+        for neighbor in graph[node]:
+            if neighbor not in graph:
+                raise ValueError("dangling graph edge")
+            if neighbor not in visited:
+                if len(visited) >= max_nodes:
+                    raise ValueError("node cap exceeded")
+                visited.add(neighbor)
+                queue.append(neighbor)
+    return order
+
+assert bfs("gateway", TOY) == ["gateway", "web", "database", "app"]
+try:
+    bfs("gateway", TOY, max_nodes=2)
+except ValueError:
+    pass
+else:
+    raise AssertionError("vertex cap bypassed")
+print("D02-F: BFS visits each node once")
+```
+
+**Trace:**
+
+| Queue before pop | Node visited | Neighbors newly queued |
+|---|---|---|
+| [gateway] | gateway | web, database |
+| [web, database] | web | app |
+| [database, app] | database | none |
+| [app] | app | gateway is already visited |
+
+BFS/DFS traversal time is O(V+E) for an adjacency list when each vertex and edge is processed a bounded number of times; auxiliary space O(V), excluding the graph storage. For a huge attacker-controlled graph, cap vertices, neighbor counts and total edges. A cap hit must return **incomplete or error**, never silently return a seemingly complete reachability report.
+
+**Independent task:** implement iterative DFS with a list as a stack; predict how its order differs from BFS. Then implement shortest unweighted path using a predecessor map. Use toy graphs only, not network exploration against real hosts.
+
+## 2.13 Deep Core VII — Weighted graphs and Dijkstra's algorithm
+
+If edges have different **nonnegative** costs (latency, distance or a synthetic effort score), BFS no longer guarantees the minimum total weight. Dijkstra's algorithm maintains best-known distances from a start node and repeatedly expands the smallest tentative distance using a min-heap.
+
+**Core invariant:** Once the smallest-distance node is removed from the priority queue with a non-stale distance, nonnegative edge weights ensure that no later path can improve it. **Negative edges invalidate this argument**; reject them explicitly or choose a different algorithm with appropriate guarantees.
+
+```python
+# DEEP_CORE_RUNNABLE
+from heapq import heappop, heappush
+from math import isfinite
+
+def dijkstra(graph: dict[str, dict[str, float]], start: str) -> dict[str, float]:
+    if start not in graph or len(graph) > 100:
+        raise ValueError("invalid start or vertex cap")
+    distances = {start: 0.0}
+    pending = [(0.0, start)]
+    while pending:
+        cost, node = heappop(pending)
+        if cost != distances[node]:
+            continue                # stale heap entry
+        for neighbor, weight in graph[node].items():
+            if neighbor not in graph:
+                raise ValueError("unknown neighbor")
+            if type(weight) not in (int, float) or not isfinite(weight) or weight < 0:
+                raise ValueError("edge weight must be finite and nonnegative")
+            candidate = cost + weight
+            if candidate < distances.get(neighbor, float("inf")):
+                distances[neighbor] = candidate
+                heappush(pending, (candidate, neighbor))
+    return distances
+
+toy = {
+    "A": {"B": 4.0, "C": 1.0},
+    "B": {"D": 1.0},
+    "C": {"B": 2.0, "D": 8.0},
+    "D": {},
+}
+result = dijkstra(toy, "A")
+assert result == {"A": 0.0, "C": 1.0, "B": 3.0, "D": 4.0}
+try:
+    dijkstra({"A": {"B": -1.0}, "B": {}}, "A")
+except ValueError:
+    pass
+else:
+    raise AssertionError("negative weight accepted")
+print("D02-G: shortest path with nonnegative weights")
+```
+
+**Trace from A:** start A=0. Inspect edges A→C=1 and A→B=4. Expand C=1 and discover C→B=2, yielding B=3 (better than 4), and C→D=8, yielding D=9. Expand B=3 and improve D to 4 through B→D=1. Expand D=4. A stale queued candidate B=4 can be ignored.
+
+**Complexity:** with an adjacency list and binary heap, roughly O((V+E) log V) is commonly cited when heap entries are managed appropriately, though this implementation can keep stale heap entries, giving bounds expressed with O((V+E) log(V+E)) for a simple accounting. Memory is O(V+E) for the input and up to O(E) heap entries in typical implementations. This algorithm is **not** a vulnerability graph risk model: adding arbitrary numbers to "severity" labels cannot make them legitimate path weights.
+
+**Exercise:** add predecessor tracking to reconstruct A→C→B→D and explain why an unreachable node is absent from the returned dictionary. Add tests for zero weights, disconnected vertices, NaN and infinity. Show that your code never automatically queries real network topology.
+
+## 2.14 Deep Core VIII — Dynamic programming: solve once, reuse the answer
+
+Dynamic programming (DP) applies when a problem has **overlapping subproblems** and an **optimal substructure** property. Instead of calculating the same subproblem repeatedly, keep answers in a table (bottom-up) or cache them (top-down memoization).
+
+An introductory example: minimum edit distance between two short strings using insertions, deletions and substitutions of cost 1. This measures **string distance**, not proof that two user identities refer to the same person. A machine-generated suggestion should be reviewed against authoritative identity records.
+
+Define `dp[i][j]` as the minimum edits to convert the first `i` characters of `a` into the first `j` characters of `b`. The recurrence compares deletion (`dp[i-1][j]+1`), insertion (`dp[i][j-1]+1`), and substitution/match (`dp[i-1][j-1]+cost`).
+
+```python
+# DEEP_CORE_RUNNABLE
+def edit_distance(a: str, b: str, max_length: int = 64) -> int:
+    if (type(a) is not str or type(b) is not str
+            or not 0 <= len(a) <= max_length or not 0 <= len(b) <= max_length):
+        raise ValueError("bounded text required")
+    previous = list(range(len(b) + 1))
+    for i, char_a in enumerate(a, start=1):
+        current = [i]
+        for j, char_b in enumerate(b, start=1):
+            current.append(min(
+                previous[j] + 1,            # delete from a
+                current[j-1] + 1,           # insert into a
+                previous[j-1] + (char_a != char_b),  # substitute/match
+            ))
+        previous = current
+    return previous[-1]
+
+assert edit_distance("", "abc") == 3
+assert edit_distance("kitten", "sitting") == 3
+assert edit_distance("same", "same") == 0
+try:
+    edit_distance("x" * 65, "")
+except ValueError:
+    pass
+else:
+    raise AssertionError("unbounded dynamic-programming input accepted")
+print("D02-H: recurrence and bounded DP table")
+```
+
+| Prefixes | Interpretation | Expected DP value |
+|---|---|---:|
+| empty → "a" | one insertion | 1 |
+| "a" → "a" | exact match | 0 |
+| "a" → "b" | one substitution | 1 |
+| "ab" → "a" | one deletion | 1 |
+
+**Complexity:** full DP table takes O(mn) time and O(mn) memory; the rolling-row implementation above takes O(mn) time and O(n) auxiliary list memory where `n=len(b)`. It still uses time proportional to the **product** of input lengths, which is why input bounds matter.
+
+**Security reasoning:** edit-distance similarity may help an analyst investigate **possible** related strings, but automatically merging account IDs risks false matches and privilege errors. It must not be used as an authorization mechanism.
+
+## 2.15 Deep Core IX — Deterministic priority queues, top K and fairness
+
+A heap is a partially ordered tree-like array. With `heapq`, the smallest item is at index zero. `heappush`/`heappop` typically cost O(log N). A heap is not a fully sorted list; never assume iterating over it yields items in rank order. For top K, `heapq.nlargest(k, records, key=...)` is often useful when K is far smaller than N.
+
+Tie-breaking matters: if two findings have the same severity, use a deterministic secondary key, such as timestamp and event ID, to make reports reproducible. Priority is not proof of maliciousness; a high-severity alert may be a false positive.
+
+```python
+# DEEP_CORE_RUNNABLE
+import heapq
+
+findings = [
+    {"id": "C", "severity": 5, "time": 3},
+    {"id": "A", "severity": 8, "time": 1},
+    {"id": "B", "severity": 8, "time": 2},
+    {"id": "D", "severity": 1, "time": 4},
+]
+ranked = sorted(findings, key=lambda r: (-r["severity"], r["time"], r["id"]))
+assert [r["id"] for r in ranked] == ["A", "B", "C", "D"]
+top_two = heapq.nsmallest(2, findings, key=lambda r: (
+    -r["severity"], r["time"], r["id"]
+))
+assert [r["id"] for r in top_two] == ["A", "B"]
+print("D02-I: deterministic priority order")
+```
+
+**Think deeper:** alert triage fairness may require policies beyond pure severity sorting. If analysts only ever work the highest-volume source, lower-volume critical signals may starve. A production queue needs an age policy, ownership, escalation and explicit workflow state, not just a heap.
+
+## 2.16 Deep Core X — Streaming aggregation with honest resource limits
+
+"Streaming" describes how input is consumed, not necessarily how much memory the *result* retains. A program that reads one JSONL line at a time but stores every unique user key can still use O(U) memory where U is distinct identities. An attacker generating one new actor per event can stress a detector more than a million events from the same actor.
+
+Define resource budgets *before* implementing: total records, maximum bytes per record, maximum distinct actors, events retained per actor, time allowed, memory or disk budget, and output cap. A cap hit must be an error/incomplete state unless a safe lossy policy was deliberately specified.
+
+```python
+# DEEP_CORE_RUNNABLE
+from collections import Counter
+
+def bounded_counts(records, max_actors: int = 3):
+    if type(max_actors) is not int or not 1 <= max_actors <= 100:
+        raise ValueError("actor cap")
+    count = Counter()
+    for actor in records:
+        if type(actor) is not str or not 1 <= len(actor) <= 16:
+            raise ValueError("invalid actor")
+        if actor not in count and len(count) >= max_actors:
+            raise ValueError("actor cap exceeded: report incomplete")
+        count[actor] += 1
+    return count
+
+assert bounded_counts(["a", "a", "b"]) == {"a": 2, "b": 1}
+try:
+    bounded_counts(["a", "b", "c", "d"])
+except ValueError as exc:
+    assert "incomplete" in str(exc)
+else:
+    raise AssertionError("cardinality overflow silently accepted")
+print("D02-J: input streaming does not imply bounded aggregation")
+```
+
+**Engineering progression:** use a list/Counter for small fixtures, then a bounded deque for time windows, then disk-backed key/value state for large authorized feeds. You must still decide how to expire keys, handle late events, manage duplicates and record incomplete processing. SQLite transactions and source-qualified event IDs become relevant later in the curriculum.
+
+## 2.17 Deep Core XI — Project: a deterministic offline burst detector
+
+Build a CLI using a JSONL fixture of synthetic authentication events. Requirements:
+1. Validate each event's exact JSON schema, UTF-8, byte count, source-qualified event ID, aware timestamp and action.
+2. Require nondecreasing event times or declare a separate late-event strategy.
+3. Keep bounded per-actor rolling windows for failed logins.
+4. Deduplicate source/event IDs; do not silently ignore conflicting records.
+5. Emit only one alert per continuous threshold crossing; re-arm correctly after event count drops.
+6. On any invalid input or exceeded cap, leave the previous complete report intact and return an error.
+7. Include supporting event references and explain that a *review alert* is not proof of compromise.
+
+**Test trace:**
+
+| Synthetic failures | Expected alerts | Why |
+|---|---|---|
+| at 0, 30, 60 sec | 1 | inclusive 60 sec boundary |
+| at 0, 30, 60, 61 sec | 1 | replacement at threshold must not re-alert |
+| at 0, 30, 61 sec | 0 | oldest expired before third |
+| at 0, 30, 60, 200, 210, 220 | 2 | re-arm after count drops |
+| malformed JSON after a valid burst | no new complete report | batch must fail visibly |
+
+The [reference project](../projects/foundations/window_detector.py) and its [tests](../tests/test_foundations_projects.py) provide a tested baseline, but you should **build your solution first**. Run on a local fixture only; do not use the toy signal to lock accounts.
+
+## 2.18 Deep Core XII — Independent exercise bank and answer separation
+
+Solve [25 Data Structures & Algorithms exercises](../python/exercises/02-DATA-STRUCTURES-ALGORITHMS-EXERCISES.md), progressing through Big-O reasoning, implementation, boundary testing, graph paths, edit distance and detector engineering. A [separate worked solution key](../python/solutions/02-DATA-STRUCTURES-ALGORITHMS-SOLUTIONS.md) is provided for feedback after attempting each problem.
+
+**Mastery gates:** describe time and auxiliary-space complexity; reproduce the algorithm's invariant; test empty/duplicate/boundary input; explain resource exhaustion for untrusted data; demonstrate a complete failure path rather than silently returning an empty result.
+
+**What is not claimed:** learning BFS, Dijkstra and edit distance alone does not establish a cybersecurity practitioner's ability to identify attacks. These algorithms become useful only when the data sources, labels, authorization and problem model are sound.
+
+
 ## Collections
 | Type | Ordering | Mutable? | Typical cybersecurity use |
 |---|---|---|---|
