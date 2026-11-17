@@ -1,4 +1,6 @@
 # 08 — Threads, processes, asyncio and resilient I/O
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [concurrency async os automation](../course/08-CONCURRENCY-ASYNC-OS-AUTOMATION.md).
+
 
 ## Choose the right model
 - **Threading:** convenient for blocking I/O; shared mutable state requires synchronization.

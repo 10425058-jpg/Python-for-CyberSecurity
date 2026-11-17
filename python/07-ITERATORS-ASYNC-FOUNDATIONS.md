@@ -1,4 +1,6 @@
 # 07 — Iterators, generators, context managers and decorators
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [collections complexity streams](../course/03-COLLECTIONS-COMPLEXITY-STREAMS.md) · [concurrency async os automation](../course/08-CONCURRENCY-ASYNC-OS-AUTOMATION.md).
+
 
 ## Iteration protocol
 An iterable returns an iterator via `iter()`; an iterator provides successive values via `next()` and raises `StopIteration` at exhaustion. Generator functions use `yield`, suspending between items rather than allocating a complete collection.

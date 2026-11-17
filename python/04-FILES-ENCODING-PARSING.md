@@ -1,4 +1,6 @@
 # 04 — Files, binary data, parsing and evidence hygiene
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [bytes encoding binary parsers](../course/04-BYTES-ENCODING-BINARY-PARSERS.md) · [files json sql trust boundaries](../course/05-FILES-JSON-SQL-TRUST-BOUNDARIES.md).
+
 
 ## File handling
 Use `pathlib.Path` and context managers. Text and bytes are different: `read_text(encoding="utf-8")`, `read_bytes()`, streaming with `open(..., encoding="utf-8")`. Ensure you have permission and avoid modifying originals when processing forensic artifacts.

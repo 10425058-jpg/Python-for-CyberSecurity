@@ -1,4 +1,6 @@
 # 10 — CLI engineering, distribution and software supply chain
+> **Need more depth?** This is the quick-reference chapter. Continue with fully explained English lessons, worked examples, negative tests and practical exercises: [testing ci and supply chain](../course/07-TESTING-CI-AND-SUPPLY-CHAIN.md).
+
 
 ## CLI design
 Use `argparse` for clear options, validation, help text and exit codes. Define stable output formats (JSONL/CSV), stderr for errors, and stdout for machine-readable results. Never echo tokens passed through flags.
