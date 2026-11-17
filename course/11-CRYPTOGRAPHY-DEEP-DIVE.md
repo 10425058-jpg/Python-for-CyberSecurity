@@ -180,3 +180,90 @@ Even correctly decrypted data must be checked against access policies. Even a va
 | Custom crypto protocols | hidden design flaws |
 
 **References:** [cryptography.io](https://cryptography.io/en/stable/), [OWASP Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [secrets](https://docs.python.org/3/library/secrets.html).
+
+
+## 11. Security protocol design case: an encrypted lab record
+
+You want to store a private synthetic note. AES-GCM provides confidentiality and authentication **only when the key is strong, nonce uniqueness holds and the caller checks authentication failures**. The security of the overall application still depends on access control and key management.
+
+### Explicit message format for the teaching exercise
+
+```text
+version  | nonce (12 bytes)  | ciphertext+tag
+0x01     | 96-bit GCM nonce | variable length
+```
+
+```python
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.exceptions import InvalidTag
+import os
+
+def encrypt_note(key: bytes, plaintext: bytes, tenant: str) -> bytes:
+    if len(key) not in (16, 24, 32) or not isinstance(plaintext, bytes):
+        raise ValueError("invalid key length or plaintext")
+    if not tenant or len(tenant) > 64:
+        raise ValueError("invalid tenant")
+    nonce = os.urandom(12)
+    aad = ("note:v1:" + tenant).encode("utf-8")
+    return b"\x01" + nonce + AESGCM(key).encrypt(nonce, plaintext, aad)
+
+def decrypt_note(key: bytes, envelope: bytes, tenant: str) -> bytes:
+    if len(envelope) < 1 + 12 + 16 or envelope[0] != 1:
+        raise ValueError("invalid encrypted note envelope")
+    nonce = envelope[1:13]
+    ciphertext_and_tag = envelope[13:]
+    aad = ("note:v1:" + tenant).encode("utf-8")
+    return AESGCM(key).decrypt(nonce, ciphertext_and_tag, aad)
+
+key = AESGCM.generate_key(bit_length=256)
+sealed = encrypt_note(key, b"synthetic private note", "lab-a")
+assert decrypt_note(key, sealed, "lab-a") == b"synthetic private note"
+try:
+    decrypt_note(key, sealed, "lab-b")
+except InvalidTag:
+    pass
+else:
+    raise AssertionError("cross-tenant AAD mismatch was accepted")
+```
+
+**Security limitations of this illustration:** it uses randomly generated GCM nonces without tracking uniqueness (acceptable only at well-controlled low volumes within conservative bounds); it has no durable key identifier or rotation, secure secret storage, length cap, authenticated version negotiation or replay protection. In production choose a maintained high-level storage protocol and KMS, and check nonces per key. The function does not confirm a tenant is authorized to call it.
+
+### Step-by-step reasoning
+
+1. Generate a high-entropy key using a verified primitive, not `random.Random`.
+2. Build authenticated context (tenant/version) as AAD.
+3. Generate an independent nonce for this encryption *under the same key*.
+4. Encrypt; library emits ciphertext and authentication tag.
+5. Store version, nonce and ciphertext+tag.
+6. On read, verify the complete envelope and require exact tenant context.
+7. If authentication fails, return an error; never expose unauthenticated plaintext.
+
+## 12. Why signatures, HMAC and hashing cannot substitute for one another
+
+**Scenario:** two services share a secret HMAC key. A valid HMAC proves that someone with the shared key produced the tag; it does not distinguish which of those services created it. A digital signature, by contrast, uses a private key and can be verified using its corresponding public key—but key identity, custody, time and compromise still matter.
+
+| Property | Plain SHA-256 | HMAC-SHA-256 | AEAD | Digital signature |
+|---|---|---|---|---|
+| Needs a secret key | no | yes | yes | signer holds private key |
+| Hides plaintext | no | no | yes | no |
+| Detects unauthorized changes | only against trusted reference | yes under key trust | yes under key trust | yes under public-key trust |
+| Strong origin attribution | no | shared-key group only | shared-key group only | depends on trusted signer key |
+| Supports password storage directly | no | no | no | no |
+
+For password verification use a *password-specific KDF* such as Argon2id where appropriate, or scrypt/PBKDF2 under operational constraints. Do not use fast SHA-256 alone.
+
+## 13. Exercises and failure-case answers
+
+**A:** Flip one byte of an AES-GCM ciphertext. Decryption should fail authentication, not return altered plaintext.
+
+**B:** Reuse the *same* nonce with the *same* key in an illustration only and explain the risk without publishing a real attack. Answer: security guarantees can be catastrophically compromised; never do this in a real application.
+
+**C:** Explain why `nonce` is not itself confidential. It is a uniqueness input, not a secret key; authentication still requires correct key handling.
+
+**D:** Design a key-rotation manifest containing key identifier, creation time, algorithm, ownership and retirement status—but **no key material**.
+
+**E:** Explain why `hashlib.sha256(password)` is unsuitable for production password verification. Answer: computationally cheap for offline guessing; use memory/time-hard KDF with salts and configuration.
+
+**F:** In a multi-tenant store, explain what AAD solves (mix-and-match authenticated context) and what it does not (per-user access authorization).
+
+**External references:** [cryptography.io AEAD](https://cryptography.io/en/stable/hazmat/primitives/aead/), [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
