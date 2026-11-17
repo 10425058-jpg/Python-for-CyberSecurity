@@ -9,6 +9,65 @@ Imagine one million synthetic authentication records arriving every day. You nee
 
 The fundamental skill is choosing a data structure for each operation rather than reflexively putting everything into one list.
 
+## Masterclass — two independent state machines inside a sliding-window detector
+
+An efficient burst detector is not only a `deque`. It is a **window state machine** (which events are currently within the interval) coupled with a **notification state machine** (has an alert already been issued for this continuing burst?). Confusing them creates duplicate alerts or missed incidents.
+
+**Exact invariant:** for an inclusive `60`-second window, an event at time `t` retains timestamps `s` where `t-s <= 60`. The alert becomes active when the validated failure count first reaches the threshold. It re-arms only after the **post-arrival** count is below threshold. Checking only the count immediately *after expiration but before appending* can cause a false second threshold crossing when one old event is replaced by a new one.
+
+| Time | Queue after expiration and append | Latch | Alert? |
+|---|---|---|---|
+| 0 | [0] | off | no |
+| 30 | [0,30] | off | no |
+| 60 | [0,30,60] | on | **first** |
+| 61 | [30,60,61] | on | **no duplicate** |
+| 200 | [200] | off | no |
+| 210 | [200,210] | off | no |
+| 220 | [200,210,220] | on | **second** |
+
+**Runnable reference with deterministic assertions:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from collections import deque
+
+def alerts(times: list[int], threshold: int = 3, window: int = 60) -> list[int]:
+    if threshold < 1 or window < 1 or times != sorted(times):
+        raise ValueError("invalid parameters or out-of-order events")
+    queue = deque()
+    notified = False
+    emitted = []
+    for t in times:
+        if type(t) is not int or t < 0:
+            raise ValueError("timestamps must be nonnegative integers")
+        while queue and t - queue[0] > window:
+            queue.popleft()
+        queue.append(t)
+        if len(queue) < threshold:
+            notified = False
+        if len(queue) >= threshold and not notified:
+            emitted.append(t)
+            notified = True
+    return emitted
+
+assert alerts([0, 30, 60, 61, 200, 210, 220]) == [60, 220]
+assert alerts([0, 30, 60, 61]) == [60]
+assert alerts([0, 30, 61]) == []
+try:
+    alerts([60, 30])
+except ValueError:
+    pass
+else:
+    raise AssertionError("out-of-order records accepted")
+```
+
+**Proof sketch:** each timestamp enters the deque once and leaves at most once, so deque operations are amortized linear in event count. That does **not** guarantee bounded memory: in a real detector, actors and per-actor event queues need caps, and deduplication requires a bounded or persistent identity policy.
+
+**Boundary exercise:** replace the expiration condition `> window` with `>= window`. Which of [0,30,60] now fails to alert? Explain why rule documentation must state inclusive/exclusive window boundaries. Then write a regression test for the **replacement-at-threshold** case [0,30,60,61], which has caused real bugs in the learning code.
+
+**Operational lesson:** a state machine can be perfectly coded and still generate false positives from password managers or load tests. An alert must have evidence IDs, a documented source-clock model and human review; never disable an account automatically from this toy rule.
+
+
 ## 1. List, tuple, dict, set: semantics and tradeoffs
 
 | Type | Shape | Typical operations | Security use | Trap |

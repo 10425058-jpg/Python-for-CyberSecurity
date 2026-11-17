@@ -7,6 +7,70 @@
 ## Learning outcomes
 By the end, you can explain the difference between a variable name and an object, predict mutability and aliasing bugs, distinguish bytes from text, understand numeric edge cases, and build input validators that do not silently accept unintended types.
 
+## Masterclass — when Python equality silently collapses security identities
+
+**Big idea.** Equality, identity, type membership and dictionary keys are four different mechanisms. A security engineer cannot substitute one for another. A dictionary uses hash and equality to select keys: values that compare equal and have compatible hashes can occupy the same entry, even if their types differ.
+
+**Case:** a configuration parser uses `1` for an integer permission level and `True` for an enabled flag. In Python, `True == 1` and `hash(True) == hash(1)`. Therefore `{1: "level-one", True: "enabled"}` has only **one** entry. This is not a Python bug; it follows the value and hashing contracts. The security bug is failing to distinguish different *semantic fields* before mapping them to keys.
+
+| Statement | Predicted result | Explanation |
+|---|---|---|
+| `True == 1` | `True` | numeric equality |
+| `True is 1` | `False` | different objects; never use `is` for value comparison |
+| `type(True) is int` | `False` | exact type differs |
+| `isinstance(True, int)` | `True` | `bool` inherits from `int` |
+| `len({1: "a", True: "b"})` | `1` | equal keys share a slot |
+
+**Runnable investigation (Python 3.11+):**
+
+```python
+# MASTERCLASS_RUNNABLE
+import math
+
+assert True == 1 and hash(True) == hash(1)
+assert type(True) is bool and type(True) is not int
+keys = {1: "level one", True: "enabled"}
+assert len(keys) == 1 and keys[1] == "enabled"
+
+def valid_limit(value: object) -> int:
+    if type(value) is not int or not 1 <= value <= 20:
+        raise ValueError("limit must be an integer 1..20")
+    return value
+
+assert valid_limit(3) == 3
+for wrong in (True, False, 3.0, "3", None, -1):
+    try:
+        valid_limit(wrong)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted {wrong!r}")
+
+def valid_confidence(value: object) -> float:
+    if type(value) not in (int, float):
+        raise ValueError("numeric confidence required")
+    number = float(value)
+    if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+        raise ValueError("confidence outside [0,1]")
+    return number
+
+assert valid_confidence(0.75) == 0.75
+for wrong in (float("nan"), float("inf"), -0.1, True):
+    try:
+        valid_confidence(wrong)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid confidence accepted")
+```
+
+**Walk it through.** First predict the dictionary's length; then inspect the type of `True`. Notice that a range check such as `0 <= x <= 1` alone does not reject `nan` in the *expected* way: each comparison involving NaN is false, so a negated conjunction must be carefully interpreted. The explicit `math.isfinite` guard communicates the policy and rejects both NaN and infinities. Build validated domain objects **before** using input as keys, cache identities or rule parameters.
+
+**Challenge without the answer first:** (1) What happens if a dict literal contains `0` and `False`? (2) Why is `if payload.get("limit")` not a presence check? (3) Should account identities be lowercased automatically? Write a counterexample for each. **Check:** `0` and `False` collide; an explicit zero is falsy; identity canonicalization depends on the authoritative provider.
+
+**Engineering test:** require every external numeric policy field to have *type, range, finiteness, semantic meaning and a malformed-input behavior*. A valid Python object is not necessarily an authorized or trustworthy fact.
+
+
 ## 1. What happens when you run a Python program?
 
 Suppose you run `python app.py`. The OS starts a Python interpreter process. The interpreter reads the source, compiles it into instructions (usually bytecode in CPython), and executes those instructions. It imports referenced modules as needed. When imported, top-level module statements execute: this is why a network call at module import time is dangerous in library code.
