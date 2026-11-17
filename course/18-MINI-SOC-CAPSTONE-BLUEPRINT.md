@@ -1,5 +1,7 @@
 # Deep Dive 18 — Full mini-SOC capstone blueprint, architecture and acceptance criteria
 
+> **Hands-on:** [Chapter 18 Guided Lab](../lab-manual/18-GUIDED-LAB.md) · [100 worked answers](../solutions/by-exercise/README.md). Test realistic error conditions before proceeding.
+
 **Level:** advanced project · **Estimated build:** 6–12+ weeks at 10 hours/week, depending on prior experience.
 
 ## 0. Project objective
