@@ -30,8 +30,8 @@ In a terminal, find a **Python 3.11+** installation. On Windows, `py -3 --versio
 ```bash
 # Windows PowerShell (from your project directory)
 py -3 -m venv .venv
-.venv\Scripts\python.exe --version
-.venv\Scripts\python.exe -m pip --version
+.\.venv\Scripts\python.exe --version
+.\.venv\Scripts\python.exe -m pip --version
 
 # Linux/macOS (from your project directory)
 python3 -m venv .venv
