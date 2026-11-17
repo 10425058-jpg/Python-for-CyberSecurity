@@ -241,3 +241,117 @@ Testing needs normal, boundary and error cases. A test named `test_policy` is le
 **Review questions:** Why use keyword-only arguments? When is an exception more appropriate than returning `None`? What does a generator give up in exchange for low memory?
 
 **References:** [Python control flow](https://docs.python.org/3/tutorial/controlflow.html), [exception hierarchy](https://docs.python.org/3/library/exceptions.html), [contextlib](https://docs.python.org/3/library/contextlib.html).
+
+
+## 11. Detailed failure-handling case: building a defensive event classifier
+
+A fragile program might report "0 suspicious events" after catching `Exception` and discarding parser failures. That is a **false all-clear**: the user cannot tell the difference between a clean dataset and an unreadable dataset.
+
+### Design the function contract first
+
+Input: a list of synthetic event dictionaries, each containing `action` (string) and `actor` (nonempty string). Output: number of failures by actor. Error behavior: reject an invalid row with its index. Side effects: none. Resource policy: at most 1000 events and 100 different actors. A function that satisfies this contract is testable without a database or network.
+
+```python
+from collections import Counter
+
+def count_failures(events: list[dict]) -> dict[str, int]:
+    if type(events) is not list or len(events) > 1000:
+        raise ValueError("expected up to 1000 events")
+    totals = Counter()
+    for index, event in enumerate(events):
+        if type(event) is not dict or set(event) != {"actor", "action"}:
+            raise ValueError(f"row {index}: invalid schema")
+        actor = event["actor"]
+        action = event["action"]
+        if type(actor) is not str or not 1 <= len(actor) <= 64:
+            raise ValueError(f"row {index}: invalid actor")
+        if action not in ("login_failure", "login_success"):
+            raise ValueError(f"row {index}: invalid action")
+        if action == "login_failure":
+            if actor not in totals and len(totals) >= 100:
+                raise ValueError("actor cardinality cap exceeded")
+            totals[actor] += 1
+    return dict(totals)
+
+assert count_failures([
+    {"actor":"alice","action":"login_failure"},
+    {"actor":"alice","action":"login_success"},
+    {"actor":"alice","action":"login_failure"},
+]) == {"alice":2}
+```
+
+**Explain the order:** validate the container before looping, schema before indexing, actor before using it as a dictionary key, action before branching, and cardinality before inserting a **new** actor. One malformed event invalidates the whole batch. That is a deliberate strict policy; systems using quarantine instead must track rejected rows and completeness.
+
+### Proof obligations and tests
+
+```python
+import unittest
+
+class CountingContractTests(unittest.TestCase):
+    def test_empty_means_complete_zero(self):
+        self.assertEqual(count_failures([]), {})
+
+    def test_bad_record_not_silently_ignored(self):
+        with self.assertRaisesRegex(ValueError, "row 0"):
+            count_failures([{"actor":"alice"}])
+
+    def test_malformed_type_rejected(self):
+        with self.assertRaises(ValueError):
+            count_failures([{"actor":None,"action":"login_failure"}])
+
+    def test_unknown_action_rejected(self):
+        with self.assertRaises(ValueError):
+            count_failures([{"actor":"a","action":"reset-password"}])
+```
+
+A return value of `{}` now has a precise meaning: the *valid complete input* contained no failures. It never represents a suppressed parse error.
+
+## 12. Scope, closures and an accidental policy bug
+
+```python
+thresholds = [2, 4, 8]
+bad_rules = [lambda count: count >= threshold for threshold in thresholds]
+print([rule(3) for rule in bad_rules])  # [False, False, False]
+```
+
+All closures read the final loop variable when invoked: `threshold==8`. The corrected form captures each value explicitly:
+
+```python
+rules = [lambda count, t=t: count >= t for t in thresholds]
+assert [rule(3) for rule in rules] == [True, False, False]
+```
+
+**Cybersecurity consequence:** detection rules generated using a loop can unintentionally all use the highest threshold, hiding important events. Prefer a named function or a typed policy object for serious security decisions.
+
+## 13. A complete command-line exit policy
+
+Your CLI should distinguish:
+- Exit **0**: all requested input processed successfully (even if zero findings).
+- Exit **2**: malformed user input, invalid schema or incorrect usage.
+- Exit **3**: file I/O or external dependency failure (convention chosen by this program).
+- Exit **130**: interrupted by Ctrl+C on many Unix-like shells (platform-specific).
+
+```python
+import sys
+
+def run_cli(path, parser):
+    try:
+        return parser(path)
+    except ValueError as exc:
+        print(f"invalid input: {exc}", file=sys.stderr)
+        return 2
+    except OSError as exc:
+        print(f"I/O failure: {type(exc).__name__}", file=sys.stderr)
+        return 3
+```
+
+The contract above treats `parser` as an injected operation whose return value is an integer status; document it or return a typed result object instead. Don't log full untrusted records or secrets. Specific errors are preferred to silently catching every failure.
+
+### Exercise ladder and checks
+1. **Predict** the outcome of `if []: ... elif 0: ... else: ...`. Answer: else branch.
+2. **Refactor** a function using `except Exception: return []` so failure cannot be confused with a valid empty result.
+3. **Test** invalid `action` values, including a dict, a list and a 1 MB string. Enforce overall byte caps before materializing large records.
+4. **Analyze** why it is wrong to grant access in a broad exception handler. Answer: exceptions must fail closed at authorization boundaries.
+5. **Design** retry behavior when an API write times out. A timeout does **not** prove the server never executed the write: use idempotency keys or read-back validation.
+
+**Discussion:** would skipping one bad row be preferable to failing the entire batch? Either can be appropriate, but the API must explicitly report incomplete processing, quarantine counts and which evidence was discarded.
