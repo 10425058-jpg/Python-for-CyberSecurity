@@ -6,6 +6,14 @@
 
 Every chapter now links to its own [step-by-step guided lab](../lab-manual/README.md). The [100-solution answer bank](../solutions/by-exercise/README.md) expands all original exercise prompts into runnable or defensible answers, and the [project build path](../projects/BUILD-PATH.md) provides tested starter programs for integrity monitoring, IOC quality, evidence timelines and detection evaluation.
 
+## Masterclass — a deeper way to study each chapter
+
+Each of the 22 chapters has an early **Masterclass** section aimed at the hardest conceptual mistake in that topic. This is different from simply adding another introduction: it presents a causal explanation, a concrete input/output or decision table, a reproducible defensive Python example, its precise limitations, and an independent extension question.
+
+**Suggested 30-minute teaching loop:** first predict the result without executing; run the code; alter one boundary condition; explain why the code rejects it or changes output; write one new assertion; then teach the concept in plain English without code. This is followed by the longer chapter explanation, the [matching Guided Lab](../lab-manual/README.md), and the [100 worked-answer exercises](../solutions/by-exercise/README.md).
+
+Masterclass code blocks are marked with `# MASTERCLASS_RUNNABLE`. The [test harness](../tests/test_masterclass_chapters.py) **executes all 22 tagged examples** on each tested Python version, rather than relying on syntax checks alone. The [editorial standard](../reference/EDITORIAL-QUALITY-STANDARD.md) documents requirements and acknowledges remaining limitations; passing tests is not a blanket claim of security.
+
 ## How to learn efficiently
 
 For each unit:
