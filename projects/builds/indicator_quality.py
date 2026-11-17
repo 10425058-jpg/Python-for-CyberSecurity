@@ -1,7 +1,7 @@
 """Project 2: offline synthetic IP-indicator normalization and expiry.
 
 Usage:
- python -m projects.builds.indicator_quality fixtures/synthetic-indicators.jsonl
+ python -m projects.builds.indicator_quality fixtures/project-indicators.jsonl
 
 This example intentionally accepts only its own documented toy schema.
 No live reputation lookups, network connections, or blocking actions.
