@@ -1,5 +1,7 @@
 # Deep Dive 05 — Files, JSONL, SQL, timestamps and data trust boundaries
 
+> **Hands-on:** [Chapter 05 Guided Lab](../lab-manual/05-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** intermediate · **Estimated study:** 9–12 hours.
 
 ## Scenario

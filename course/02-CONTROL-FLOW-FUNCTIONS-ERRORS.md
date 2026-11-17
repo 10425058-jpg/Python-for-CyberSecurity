@@ -1,5 +1,7 @@
 # Deep Dive 02 — Control flow, functions, errors and designing trustworthy scripts
 
+> **Hands-on:** [Chapter 02 Guided Lab](../lab-manual/02-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** beginner → intermediate · **Estimated study:** 6–8 hours.
 
 ## Learning goals

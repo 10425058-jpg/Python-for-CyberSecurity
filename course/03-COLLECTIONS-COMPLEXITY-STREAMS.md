@@ -1,5 +1,7 @@
 # Deep Dive 03 — Data structures, algorithmic complexity and scalable security pipelines
 
+> **Hands-on:** [Chapter 03 Guided Lab](../lab-manual/03-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** beginner → intermediate · **Estimated study:** 8–12 hours.
 
 ## The problem we will solve

@@ -1,5 +1,7 @@
 # Deep Dive 07 — Tests, property-based thinking, CI and Python supply-chain security
 
+> **Hands-on:** [Chapter 07 Guided Lab](../lab-manual/07-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** intermediate · **Estimated study:** 10–14 hours.
 
 ## 1. A security tool needs evidence of correctness

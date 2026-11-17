@@ -1,5 +1,7 @@
 # Deep Dive 06 — Typing, OOP, dependency injection and designing security software
 
+> **Hands-on:** [Chapter 06 Guided Lab](../lab-manual/06-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** intermediate · **Estimated study:** 8–10 hours.
 
 ## Why architecture matters in cybersecurity

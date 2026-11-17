@@ -1,5 +1,7 @@
 # Deep Dive 01 — How Python actually works: objects, types, references, memory and trust
 
+> **Hands-on:** [Chapter 01 Guided Lab](../lab-manual/01-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** beginner → intermediate · **Prerequisites:** terminal and a working Python 3 environment · **Estimated study:** 6–10 hours.
 
 ## Learning outcomes

@@ -1,5 +1,7 @@
 # Deep Dive 08 — Concurrency, asyncio, operating systems and safe automation
 
+> **Hands-on:** [Chapter 08 Guided Lab](../lab-manual/08-GUIDED-LAB.md) · [100 numbered worked answers](../solutions/by-exercise/README.md). Complete the lab's negative tests before moving on.
+
 **Level:** intermediate → advanced · **Estimated study:** 9–13 hours.
 
 ## Scenario
