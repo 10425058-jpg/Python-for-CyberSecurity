@@ -169,3 +169,88 @@ For a runnable implementation with explicit timestamp ordering, see [examples/lo
 Why does a deque give amortized linear time? What are the memory implications of unbounded key cardinality? When would `bisect` be insufficient? How would delayed log ingestion change a detection rule?
 
 **References:** [collections](https://docs.python.org/3/library/collections.html), [heapq](https://docs.python.org/3/library/heapq.html), [bisect](https://docs.python.org/3/library/bisect.html).
+
+
+## 10. Production-style problem: repeated failures with bounded state
+
+A simple `defaultdict(deque)` is efficient **per actor** but can grow forever when millions of different usernames appear. Threat actors can exploit high-cardinality keys to exhaust memory without generating many events per account. The key observation is that "O(number of actors)" is still dangerous if that number is attacker controlled.
+
+### Trace a rolling window (including exact boundary)
+
+Window = 60 seconds; threshold = 3; events for actor Alice occur at t = [0, 30, 60, 61].
+
+| t | Remove timestamps strictly older than t−60 | Queue after append | Threshold |
+|---|---|---|---|
+| 0 | none | [0] | no |
+| 30 | none | [0,30] | no |
+| 60 | none (0 is inclusive) | [0,30,60] | yes |
+| 61 | remove 0 | [30,60,61] | remains met |
+
+A detector that sends a new alert on every qualifying event causes duplicates. Define *latch* or cooldown semantics: emit on first threshold crossing, suppress until the count falls below the threshold, then rearm. The policy affects analyst load and missed repeated bursts.
+
+### Standalone bounded detector with per-source accounting
+
+```python
+from collections import defaultdict, deque
+
+def burst_crossings(events, *, window=60, threshold=3, max_actors=100):
+    if window <= 0 or threshold <= 0 or max_actors <= 0:
+        raise ValueError("positive limits required")
+    queues = {}
+    active = set()
+    last_time = None
+    for t, actor in events:
+        if type(t) is not int or t < 0:
+            raise ValueError("invalid timestamp")
+        if last_time is not None and t < last_time:
+            raise ValueError("events must be globally time-sorted")
+        last_time = t
+        if not isinstance(actor, str) or not 1 <= len(actor) <= 64:
+            raise ValueError("invalid actor")
+        if actor not in queues:
+            if len(queues) >= max_actors:
+                raise ValueError("actor cardinality cap exceeded")
+            queues[actor] = deque()
+        q = queues[actor]
+        while q and t - q[0] > window:
+            q.popleft()
+        if len(q) < threshold:
+            active.discard(actor)
+        q.append(t)
+        if len(q) >= threshold and actor not in active:
+            active.add(actor)
+            yield {"actor": actor, "time": t, "count": len(q)}
+
+assert list(burst_crossings([(0,"a"), (30,"a"), (60,"a")])) == [
+    {"actor":"a","time":60,"count":3}
+]
+```
+
+**Complexity:** each event is appended once and removed at most once from its actor queue: amortized O(N) total deque operations. Memory is bounded by the number of stored actors and timestamps *only if* both are capped. This example caps actor cardinality but not per-actor queue size, so a production adaptation must cap it or use a counted compressed window structure.
+
+**Limitations:** no deduplication, no bounded per-actor queue, no stale-actor eviction, and the global ordering assumption is strict. It demonstrates the exact window semantics rather than a deployable SIEM.
+
+## 11. Selection of structures by query
+
+| Question | Candidate structure | Complexity / hidden costs |
+|---|---|---|
+| Have we observed this file hash before? | set of digests | expected O(1) lookup; unbounded set grows |
+| How many failures per actor? | Counter | O(N) processing, O(unique actors) memory |
+| Ten newest validated events? | deque(maxlen=10) | fixed memory, O(1) append |
+| Ten actors with highest count? | heap or Counter.most_common | requires maintained counts |
+| All events in time interval? | sorted timestamps + bisect, or indexed DB | insertions are O(N) for list |
+| Event IDs across process restart? | SQLite UNIQUE index | transactional persistence, storage cost |
+
+### Exercise ladder with model reasoning
+
+**A:** For 1,000,000 events and 20 actors, which dominates memory: entire list or Counter? Answer: full list stores O(1,000,000) records; Counter O(20).
+
+**B:** What happens with 1,000,000 distinct malicious usernames? Counter memory is O(1,000,000). Consider caps, rejected/overflow metrics and disk-backed aggregation.
+
+**C:** Build a `deque(maxlen=10)` recording last-seen *synthetic* file events. Explain why losing the oldest record is fine for an activity preview but unacceptable for evidence preservation.
+
+**D:** Add per-actor queue caps to the code above. Decide whether to stop processing or drop older entries; explain how each changes accuracy.
+
+**E:** Add unit tests for t = 60 (included) and t = 61 (first event expired), plus two actors interleaving and an out-of-order record.
+
+**Operator question:** if your pipeline must handle 10 million events/day and low-memory clients, which stage should spill to SQLite or Parquet, and why? Model throughput, query pattern and retention before picking a library.

@@ -135,3 +135,117 @@ No automated model should disable user accounts solely because an uncalibrated s
 - Which features carry privacy risk?
 
 **References:** [Python statistics](https://docs.python.org/3/library/statistics.html), [scikit-learn user guide](https://scikit-learn.org/stable/user_guide.html), [MITRE ATT&CK](https://attack.mitre.org/).
+
+
+## 11. A realistic security-statistics example: the base-rate problem
+
+Imagine an identity service processes 100,000 sessions. Your validated reference labels mark **100 malicious sessions** and **99,900 benign sessions**. A detector correctly catches 90 malicious sessions (90% recall) but falsely flags 5% of benign sessions.
+
+Expected confusion-matrix counts:
+- TP = 90.
+- FN = 10.
+- FP = 4,995.
+- TN = 94,905.
+
+Precision = `90 / (90 + 4995) ≈ 1.77%`. Despite 90% recall, about **98.23%** of alerts are false positives in this hypothetical scenario. Low base rates matter much more than intuition suggests.
+
+### Calculate the numbers with reproducible Python
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Confusion:
+    tp: int
+    fp: int
+    fn: int
+    tn: int
+
+def evaluate(m: Confusion):
+    counts = (m.tp, m.fp, m.fn, m.tn)
+    if any(type(v) is not int or v < 0 for v in counts):
+        raise ValueError("counts must be nonnegative integers")
+    precision = m.tp / (m.tp + m.fp) if m.tp + m.fp else None
+    recall = m.tp / (m.tp + m.fn) if m.tp + m.fn else None
+    false_positive_rate = (
+        m.fp / (m.fp + m.tn) if m.fp + m.tn else None
+    )
+    f1 = (
+        2 * m.tp / (2 * m.tp + m.fp + m.fn)
+        if 2 * m.tp + m.fp + m.fn else None
+    )
+    return {
+        "precision": precision,
+        "recall": recall,
+        "false_positive_rate": false_positive_rate,
+        "f1": f1,
+    }
+
+results = evaluate(Confusion(tp=90, fp=4995, fn=10, tn=94905))
+assert round(results["precision"], 4) == 0.0177
+assert results["recall"] == 0.9
+assert results["false_positive_rate"] == 0.05
+```
+
+**Why report undefined values?** If no positive predictions exist, precision has denominator zero; setting it to 100% would be misleading. An API may return `None` with explanatory metadata or use a published convention, but the decision must be explicit.
+
+## 12. Build and critique an anomaly baseline
+
+A Python prototype compares an hourly event count with the last six normal hours. The toy baseline is `[10,12,11,13,12,10]`, and the next value is `60`.
+
+```python
+from statistics import mean, pstdev
+history = [10, 12, 11, 13, 12, 10]
+observed = 60
+mu, sd = mean(history), pstdev(history)
+z = (observed - mu) / sd if sd else None
+print("baseline mean:", mu)
+print("baseline population stdev:", sd)
+print("z score:", z)
+```
+
+This is a statistical **deviation** (a large z-score), not evidence of malicious behavior. A release, backup, monitoring change, traffic surge or faulty instrumentation could cause the same observation. Counts may be seasonal, non-Gaussian and correlated; a simple normal-distribution model is inappropriate without testing assumptions.
+
+### Five common forms of leakage or bias
+
+1. **Temporal leakage:** future events influence the training baseline for a past prediction.
+2. **Identity leakage:** the same host/account appears in both train/test with nearly identical events.
+3. **Label leakage:** a post-incident classification field leaks the answer into a training feature.
+4. **Selection bias:** analysts label only previously alerted events, leaving silent misses unmeasured.
+5. **Baseline poisoning:** an adversary slowly changes background behavior to appear normal.
+
+A time-ordered evaluation is often more appropriate than a random split when you're forecasting future activity. The correct split depends on deployment and research question.
+
+## 13. Operational evaluation beyond precision and recall
+
+A security model must be evaluated along several dimensions:
+
+| Dimension | Example measure | Why it matters |
+|---|---|---|
+| Detection quality | precision, recall, PR curve | true versus false signal |
+| Alert workload | alerts per 1000 events, analyst time | team capacity |
+| Latency | p50/p95 event-to-alert delay | timely response |
+| Robustness | performance under missing fields | resilience to sensor errors |
+| Drift | feature/label changes by month | aging model |
+| Privacy | source data and retention policy | least exposure |
+| Explainability | traceable evidence and rule/model version | human review |
+| Fairness / coverage | error rates across legitimate populations | avoid systematic misses |
+| Resource cost | peak RSS, CPU, API cost | operational feasibility |
+
+**Never** use an uncalibrated anomaly score as sole justification to disable an account. Use human-approved response procedures and independent corroboration.
+
+## 14. Exercises with worked expectations
+
+**A:** With TP=45, FP=5, FN=15, TN=935, calculate precision=0.90, recall=0.75, false-positive rate≈0.00532. Explain why the false-positive rate alone may hide alert volume.
+
+**B:** Increase a synthetic detection threshold and record changes in TP/FP/FN/TN. Describe a real tradeoff, not "higher is always better."
+
+**C:** Generate a dataset with 1% positive labels. Explain why accuracy can be high for a trivial "always benign" classifier while recall is zero.
+
+**D:** Design a time-series split for a monthly stream. Include a gap or entity-level grouping if adjacent windows leak information.
+
+**E:** Write a report that separates anomaly score, model confidence/calibration and confirmed incident status. These are different constructs.
+
+**F:** State what additional evidence would justify escalating an unusually high number of login failures. Examples: successful privileged access after attempts, MFA changes, device identity and validated source provenance.
+
+**References:** [scikit-learn model evaluation](https://scikit-learn.org/stable/modules/model_evaluation.html), [Python statistics](https://docs.python.org/3/library/statistics.html).

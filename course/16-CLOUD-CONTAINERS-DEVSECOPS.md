@@ -162,3 +162,116 @@ Even a library with no listed CVEs may be malicious or abandoned. Review package
 **Q:** Why separate remediation? **A:** Changes need explicit authority, change control, rollback and independent review.
 
 **References:** [Kubernetes security](https://kubernetes.io/docs/concepts/security/), [OWASP CI/CD risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/), [Python Packaging](https://packaging.python.org/).
+
+
+## 11. Case study: a mock cloud posture audit with explainable findings
+
+The phrase "read-only cloud audit" is easy to misuse: read permissions may still reveal confidential object contents or secrets. For a compliance inventory, scope **which configuration fields** are needed and avoid broad data read access.
+
+### Pure, offline policy evaluator
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Storage:
+    account: str
+    resource_id: str
+    encryption: bool
+    public_access_blocked: bool
+
+@dataclass(frozen=True)
+class PolicyFinding:
+    account: str
+    resource_id: str
+    control: str
+    reason: str
+
+def audit_storage(record: Storage) -> list[PolicyFinding]:
+    findings = []
+    if not record.encryption:
+        findings.append(PolicyFinding(
+            record.account, record.resource_id,
+            "STORAGE-ENC-01", "encryption policy not met"
+        ))
+    if not record.public_access_blocked:
+        findings.append(PolicyFinding(
+            record.account, record.resource_id,
+            "STORAGE-PUBLIC-01", "public access policy not met"
+        ))
+    return findings
+
+test = Storage("toy-account","asset-01",False,True)
+assert len(audit_storage(test)) == 1
+```
+
+This example assumes validated typed records. In a real cloud, settings are provider-specific and might involve inheritance, organization policies, effective access, encryption keys and exceptions. A boolean check cannot fully determine compliance.
+
+### Fault injection: a missing inventory page
+
+Suppose an API returns pages 1–5 but page 4 times out. If your tool reports "all assets compliant" based on pages 1–3 and 5, it has created an unsafe false all-clear. Model the batch with a completeness status:
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class InventoryResult:
+    records: tuple[Storage, ...]
+    pages_expected: int
+    pages_received: int
+
+    @property
+    def complete(self) -> bool:
+        return (
+            self.pages_expected >= 0
+            and self.pages_received == self.pages_expected
+        )
+
+result = InventoryResult((test,), 5, 4)
+assert not result.complete
+```
+
+A complete API inventory may not expose total pages in advance; production software must follow provider-specific continuation tokens and report errors rather than assuming pagination is finished.
+
+## 12. Container execution and supply-chain trust boundaries
+
+| Boundary | Risk | Example control |
+|---|---|---|
+| Image registry → build | compromised/tag-swapped image | approved registry, immutable digests, provenance |
+| CI job → secrets | PR reads deployment credential | separate untrusted PR runners and scoped identities |
+| Container → host | privileged mode, host mounts, Docker socket | rootless where feasible, no sensitive host mounts |
+| Pod → cluster API | overbroad service-account token | scoped Kubernetes RBAC |
+| Pod → Internet/metadata | unintended exfiltration | egress/network policies and workload identity |
+| Library install → runtime | typosquatting, unsafe build backend | reviewed locked dependencies and isolation |
+
+### Why `pip install` is an execution boundary
+Python packages may execute build hooks during installation and code during import. A virtual environment makes package management cleaner but does **not** prevent malicious code from reading your user's files. Evaluate dependencies, pin verified releases and restrict CI credentials during build/test.
+
+## 13. A human-reviewed remediation flow
+
+Even a perfect policy finding does not grant permission to change infrastructure. Use:
+1. Inventory and evidence.
+2. Policy validation and false-positive review.
+3. Impact analysis and change owner.
+4. Approved maintenance window and rollback.
+5. Minimal write identity separate from inventory role.
+6. Re-scan after change, verifying actual effective settings.
+7. Audit the action and close with evidence.
+
+This separation protects availability while enabling defensible compliance.
+
+## 14. Exercises and expected answers
+
+**A:** Implement an audit of three synthetic storage records; return one or more `PolicyFinding` objects and test rule IDs.
+
+**B:** Simulate incomplete pagination. A correct report states "inventory incomplete", never "all compliant".
+
+**C:** Review a mock Kubernetes pod with privileged mode, hostPath mount and writable root filesystem. Explain three distinct risks and safer defaults.
+
+**D:** Threat-model a workflow executing untrusted PR code. Why does `permissions: contents: read` help but not protect secrets deliberately passed to the job? The job still has access to anything in its environment.
+
+**E:** Propose scoped cloud IAM permissions for reading only configuration metadata. Justify every permission and identify data you deliberately cannot read.
+
+**F:** Explain why a production cloud posture audit must inspect **effective** security state, not just one provider's displayed boolean.
+
+**References:** [OWASP CI/CD Security](https://owasp.org/www-project-top-10-ci-cd-security-risks/), [Kubernetes security](https://kubernetes.io/docs/concepts/security/).

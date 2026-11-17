@@ -189,3 +189,105 @@ Expected: synthetic Alice generates review alerts at threshold crossings based o
 **E:** Design a test showing one actor with 10,000 unique aliases can exhaust in-memory state. Propose a bounded mitigation and its possible false-negative effect.
 
 **References:** [Sigma rule documentation](https://sigmahq.io/), [MITRE ATT&CK](https://attack.mitre.org/), [OWASP Logging](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html), [NIST SP 800-61r3](https://csrc.nist.gov/pubs/sp/800/61/r3/final).
+
+
+## 13. End-to-end incident simulation: from event ingestion to a review alert
+
+A SOC rule is not just a `Counter`. It is an **operational hypothesis** with data source assumptions, time semantics, suppress/rearm policy, evidence references and measured false positives.
+
+### Define the rule in plain English first
+
+> For each validated account identity, when three unique failures occur in an inclusive rolling 300-second event-time window, emit one review candidate and suppress repeated alerts until the active failure count drops below three.
+
+Before coding, answer:
+- Is identity case sensitive?
+- What is the stable event ID and source namespace?
+- How are delayed or out-of-order records handled?
+- Do successes clear the failure window? (Not in this definition.)
+- When does suppression rearm?
+- What limits event size, actor cardinality and stored event IDs?
+- What does "complete" mean if input parsing fails?
+
+### Trace deliberately adversarial toy input
+
+| Time (UTC) | ID | Actor | Action | Unique failures in 300 s | Output |
+|---|---|---|---|---|---|
+| 10:00 | A | alice | failure | 1 | none |
+| 10:01 | B | alice | failure | 2 | none |
+| 10:01 | B | alice | failure replay | still 2 | none |
+| 10:02 | C | alice | failure | 3 | review |
+| 10:03 | D | alice | success | still 3 | none |
+| 10:10 | E | alice | failure | 1 | none; rearm |
+| 10:11 | F | alice | failure | 2 | none |
+| 10:12 | G | alice | failure | 3 | new review |
+
+A basic dedup key is `(source,event_id)`, not just `event_id`. It is still a trust assumption: the source may be buggy or compromised. An actor may be an identity-provider subject rather than a displayed username.
+
+### Run the tested local example
+
+```bash
+python -m examples.mini_soc_pipeline \
+  --input fixtures/synthetic-auth.jsonl \
+  --output findings.jsonl \
+  --threshold 3 \
+  --window-seconds 300
+python -m unittest tests.test_deep_examples.MiniSocTests -v
+```
+
+On Windows PowerShell use one line and an appropriate local output path. The tool is designed for **offline synthetic data**, not active scanning or production identity control.
+
+**Warning:** a confidence label of "rule-only" is not a probability that the account is compromised. Treat it as a transparent status explaining the finding came from a rule without corroboration.
+
+## 14. Quantitative effectiveness, with real denominators
+
+For 100 labeled synthetic cases, suppose 10 are suspicious and 90 benign. The detector catches 8 suspicious, misses 2, and flags 9 benign:
+- TP = 8
+- FN = 2
+- FP = 9
+- TN = 81
+- Precision = 8/(8+9) ≈ **0.471**
+- Recall = 8/(8+2) = **0.80**
+- False positive rate = 9/(9+81) = **0.10**
+- F1 = 16/(16+9+2) ≈ **0.593**
+
+A high recall coexists with mediocre alert usefulness. The **base rate** (how common true incidents are) matters; a detector can overwhelm analysts even with a modest false-positive rate when true incidents are rare.
+
+```python
+def metrics(tp: int, fp: int, fn: int, tn: int):
+    if any(type(v) is not int or v < 0 for v in (tp, fp, fn, tn)):
+        raise ValueError("counts must be nonnegative integers")
+    precision = tp/(tp+fp) if tp+fp else None
+    recall = tp/(tp+fn) if tp+fn else None
+    f1 = 2*tp/(2*tp+fp+fn) if 2*tp+fp+fn else None
+    return precision, recall, f1
+
+p, r, f1 = metrics(8, 9, 2, 81)
+assert round(p, 3) == 0.471
+assert r == 0.8
+assert round(f1, 3) == 0.593
+```
+
+Document undefined denominators rather than inventing precision for a detector that never predicts positives.
+
+## 15. Threat hunting and response quality
+
+An alert should include:
+- Rule ID and version.
+- Actor and normalized event-time range.
+- Supporting source-qualified event IDs.
+- Evidence link or reference (protected access).
+- Parser error count / input completeness status.
+- Time uncertainty, confidence and threshold policy.
+- Suggested **verification steps** before any containment.
+
+Never automatically disable accounts based on a weak, uncorroborated rule. It could be weaponized to cause denial of service against legitimate users. OWASP emphasizes monitoring authentication failures while evaluating context and false positives. Refer to the [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
+
+### Exercises
+1. Add an explicit duplicate-ID policy to a toy source and test two duplicates.
+2. Change time-window boundary from inclusive to exclusive. Predict which events change classification.
+3. Create a labeled table and compute precision/recall by hand before coding.
+4. Simulate parsing failure after an alert and verify the CLI does **not** claim a complete report.
+5. Write a one-page triage runbook covering benign alternatives, corroboration, escalation and analyst sign-off.
+6. Design an audit log that is useful while avoiding tokens, raw private data and unnecessary identifying details.
+
+**Answer check:** an alert is a triage input, not evidence of guilt. Report error rates and coverage gaps alongside detection counts.

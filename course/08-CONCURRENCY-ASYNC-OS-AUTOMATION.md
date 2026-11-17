@@ -159,3 +159,97 @@ Optimization steps: stream files; avoid repeated parsing; add indexes; bound que
 **E:** Explain why filesystem checks before opening cannot guarantee safety against concurrent symlink changes.
 
 **References:** [asyncio](https://docs.python.org/3/library/asyncio.html), [subprocess](https://docs.python.org/3/library/subprocess.html), [concurrent futures](https://docs.python.org/3/library/concurrent.futures.html).
+
+
+## 10. Detailed concurrency scenario: high traffic does not justify unbounded workers
+
+A security script that checks 10,000 authorized endpoints might be tempted to start 10,000 tasks simultaneously. That can exhaust file descriptors and saturate the network. On a machine with only hundreds of available sockets, **concurrency can become a denial-of-service risk against your own monitoring infrastructure**.
+
+### A bounded worker queue with no external network access
+
+To isolate concurrency mechanics, simulate service checks with `asyncio.sleep` rather than contacting a real host:
+
+```python
+import asyncio
+
+async def simulated_check(item: int) -> tuple[int, str]:
+    await asyncio.sleep(0.005)
+    return (item, "ok")
+
+async def bounded_pipeline(inputs: list[int], workers: int = 4):
+    if type(workers) is not int or not 1 <= workers <= 16:
+        raise ValueError("workers must be between 1 and 16")
+    q = asyncio.Queue(maxsize=8)
+    results = []
+
+    async def producer():
+        for item in inputs:
+            await q.put(item)
+        for _ in range(workers):
+            await q.put(None)  # explicit sentinel
+
+    async def worker():
+        while True:
+            item = await q.get()
+            try:
+                if item is None:
+                    return
+                results.append(await simulated_check(item))
+            finally:
+                q.task_done()
+
+    tasks = [asyncio.create_task(worker()) for _ in range(workers)]
+    prod = asyncio.create_task(producer())
+    try:
+        await prod
+        await q.join()
+        await asyncio.gather(*tasks)
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+    return results
+
+assert len(asyncio.run(bounded_pipeline(list(range(25))))) == 25
+```
+
+**Walkthrough:** the producer blocks when eight items occupy the queue (backpressure); four workers make progress concurrently; each processed item calls `task_done()`; sentinels let workers exit; cancellation in `finally` prevents abandoned tasks under normal error handling. A production pipeline must additionally propagate worker failures immediately and cancel the producer to avoid a deadlock if workers exit before the queue drains; this particular example assumes `simulated_check` does not fail.
+
+### Race conditions: the same ID used twice
+
+Two workers might both check "event not in database" before either inserts it, then both write. In-memory sets and the GIL are not a valid cross-process transaction guarantee. A SQLite `PRIMARY KEY` or unique constraint and a documented conflict policy is stronger, with transactions surrounding a batch.
+
+### Security checklist for an asynchronous client
+- Limit **outstanding tasks** as well as active connections.
+- Set per-step and overall deadlines.
+- Respect rate limits from target services.
+- Avoid infinite retries; distinguish transient versus permanent failures.
+- Close streams/sessions when cancelled.
+- Bound response body size before decoding.
+- Do not log bearer tokens in exception messages.
+- Handle `asyncio.CancelledError` correctly so shutdown is not hidden.
+
+## 11. OS permissions and command execution: concrete design review
+
+Suppose a privileged agent accepts a string naming a directory and starts a shell command built from it. This crosses two dangerous boundaries: user-controlled path → command arguments, and unprivileged request → privileged process.
+
+Instead:
+1. Require a read-only, allowlisted operation.
+2. Use `pathlib` or stable APIs for file handling.
+3. If an external executable is necessary, use an explicitly trusted binary and argument array.
+4. Provide no shell interpolation, minimal environment, exact parameter validation, timeout, and restricted identity.
+5. Log only sanitized identifiers and action outcomes.
+6. Test paths with spaces, Unicode, dashes, symlinks and bad permissions.
+
+**Even `shell=False` does not make an arbitrary executable safe**. Commands can interpret leading-dash filenames as options, or read privileged paths if given sufficient access.
+
+## 12. Exercises and answer logic
+
+1. **Backpressure:** set `maxsize=1` and compare completion time with `maxsize=100`. How do results and memory differ? Depends on workload; bounded queue caps in-flight waiting items.
+2. **Worker failure:** make `simulated_check` raise on item 10. Observe the hang/cleanup risk; redesign with a task group or explicit failure propagation, and test it.
+3. **Timeout:** wrap the *whole* local pipeline in a single deadline and verify resources close if cancelled.
+4. **Idempotency:** specify how an event ID should be handled if received twice after retry; explain why a simple `if id not in seen` is insufficient across processes.
+5. **Privilege audit:** identify every permission an inventory script needs. Read-only file metadata access should not imply admin-level remediation rights.
+
+**Further reading:** [asyncio queues](https://docs.python.org/3/library/asyncio-queue.html), [task cancellation](https://docs.python.org/3/library/asyncio-task.html), [subprocess](https://docs.python.org/3/library/subprocess.html).

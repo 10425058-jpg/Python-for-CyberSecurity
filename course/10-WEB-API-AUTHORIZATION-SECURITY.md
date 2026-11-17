@@ -172,3 +172,108 @@ For Django/Flask/FastAPI (check current framework docs):
 - CI and dependency review covering auth/security fixes.
 
 **References:** [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), [OWASP Authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP SSRF](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
+
+
+## 12. A complete resource-access decision: ownership, tenant and permission
+
+When designing a security dashboard, checking "the user has role analyst" is not enough if the request targets a report belonging to a different organization. Broken object-level authorization (BOLA/IDOR) commonly appears when code validates identity but does not check the *specific target resource*.
+
+### A minimal, testable authorization core
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Principal:
+    subject: str
+    tenant: str
+    permissions: frozenset[str]
+
+@dataclass(frozen=True)
+class Report:
+    report_id: str
+    tenant: str
+    owner: str
+    classification: str
+
+def may_read(p: Principal, item: Report) -> bool:
+    if p.tenant != item.tenant:
+        return False
+    if item.owner == p.subject:
+        return "report:read-own" in p.permissions
+    return ("report:read-org" in p.permissions
+            and item.classification == "organization")
+
+alex = Principal("alex", "tenant-a", frozenset({"report:read-own"}))
+sam = Principal("sam", "tenant-b", frozenset({"report:read-org"}))
+r = Report("r-100", "tenant-a", "alex", "personal")
+assert may_read(alex, r)
+assert not may_read(sam, r)
+```
+
+**Critical boundary:** the `Principal` must come from a validated server-side authentication session/token, never from request parameters. The `Report` must come from a trusted repository that enforces the record's tenant and classification correctly; a client-supplied "tenant" is not authoritative.
+
+### Decision table
+
+| Caller | Tenant match? | Owns report? | Permissions | Decision |
+|---|---|---|---|---|
+| Alex | yes | yes | read-own | allow |
+| Alex | yes | no | read-own | deny |
+| Auditor | yes | no | read-org; org report | allow |
+| Auditor | yes | no | read-org; personal report | deny |
+| Cross-tenant admin | no | any | any | deny under this policy |
+
+A production policy may require additional purpose-based access, approvals or legal restrictions. The example is intentionally strict across tenants.
+
+## 13. SQL injection prevention is not authorization
+
+Even a parameterized query like `SELECT * FROM reports WHERE id = ?` can return another user's row if the application fails to scope by tenant or check the returned object's ownership. Prefer enforcing multiple layers: parameterized values, query scope, authoritative object metadata, access decision, audit, and output redaction.
+
+**Ordering example:**
+1. Authenticate the caller.
+2. Validate report ID format/length.
+3. Read the requested report under a tenant-constrained query.
+4. Evaluate resource-level permission on the result.
+5. Serialize only fields the principal may see.
+6. Audit the decision without copying secrets into logs.
+
+## 14. Browser security: CSRF, CORS and cookies are different
+
+- **Cookie-based authentication** often needs CSRF mitigations for state-changing requests because browsers can attach cookies automatically.
+- **SameSite** can help but its exact behavior depends on deployment and browser context.
+- **CORS** determines which origins' browser scripts may read cross-origin responses; it is not server-side authentication or authorization.
+- **HttpOnly** reduces ordinary JavaScript access to cookies; it does not make an XSS vulnerability harmless.
+- **Secure** restricts cookies to secure transport under supported browser behavior; correct HTTPS and session lifetime remain necessary.
+
+### Threat model a "delete report" endpoint
+Use POST/DELETE with correct session authentication, per-object authorization, CSRF defenses if cookie-based, an audit trail, safe retries and a confirmation workflow for highly impactful actions. Do not mutate state on a simple GET.
+
+## 15. Input and output contexts
+
+An authenticated internal log message may contain user-controlled text. Rendering it inside a browser without context-appropriate encoding can introduce XSS. A validated username may still contain characters significant in HTML. Conversely, HTML-escaping a string does not make it safe for SQL: **use the defense appropriate to the sink**.
+
+| Sink | Defensive mechanism |
+|---|---|
+| SQL values | bound parameters |
+| HTML text | HTML text-context escaping |
+| HTML attributes | attribute-context escaping |
+| Shell arguments | trusted executable + explicit argument validation; no shell strings |
+| Filesystem | safe storage root, generated names, secure OS file operations |
+| Server-side URL fetch | strict destination and egress rules |
+| JSON response | JSON serializer, correct content type, client-side safe rendering |
+
+## 16. Hands-on exercises
+
+**A:** Add an `is_admin` flag to `Principal` and demonstrate why an admin flag must not bypass the tenant boundary by accident.
+
+**B:** Create tests for read-own, read-org, denied cross-tenant and denied personal-report access.
+
+**C:** Write an access-control matrix for GET/POST/DELETE and identify which server-side checks apply to every operation.
+
+**D:** Design a redacted log entry for denied access. Include request ID, pseudonymous principal, resource ID and reason code; omit tokens, cookies and sensitive report content.
+
+**E:** Explain why CORS `Access-Control-Allow-Origin: *` does not by itself enable a server-to-server client to obtain protected resources, and why it is still risky in certain browser-accessible contexts.
+
+**F:** Contrast a valid token with an authorized request. An intact signature can prove token integrity while its audience/permissions may still be wrong.
+
+**Further reading:** [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html).

@@ -131,3 +131,104 @@ If your capture tool cannot record loopback traffic on a platform, use an isolat
 **E:** Describe which TLS details can normally be inferred without decryption and which cannot. A good answer distinguishes metadata from plaintext.
 
 **References:** [Wireshark user's guide](https://www.wireshark.org/docs/), [Scapy](https://scapy.readthedocs.io/), [Python ipaddress](https://docs.python.org/3/library/ipaddress.html).
+
+
+## 11. Deep case study: reconstructing useful metadata from an offline PCAP
+
+Your approved capture includes HTTP traffic to a local lab service and some DNS queries. You want a compact report: frames analyzed, IPv4/IPv6 counts, TCP/UDP counts and the most frequent endpoint pairs. The purpose is *description*, not a declaration that an endpoint is malicious.
+
+### Parsing strategy
+
+Read one captured frame at a time. For each packet:
+1. Check which IP layer is present.
+2. Obtain source/destination IP without assuming IPv4.
+3. Check transport layer (TCP or UDP).
+4. Extract bounded metadata (ports, time, protocol).
+5. Count only data you actually observed; handle missing layers and parse errors.
+6. Stop at an explicit packet budget; report truncation.
+
+### Example implementation (Scapy, offline only)
+
+```python
+# Optional: pip install scapy in your venv.
+from collections import Counter
+from scapy.all import PcapReader, IP, IPv6, TCP, UDP
+
+def summarize_capture(path: str, limit: int = 100_000) -> dict:
+    if type(limit) is not int or not 1 <= limit <= 1_000_000:
+        raise ValueError("invalid packet limit")
+    transport = Counter()
+    peers = Counter()
+    scanned = 0
+    truncated = False
+    with PcapReader(path) as capture:
+        for packet in capture:
+            if scanned >= limit:
+                truncated = True
+                break
+            scanned += 1
+            if IP in packet:
+                src, dst = packet[IP].src, packet[IP].dst
+                transport["IPv4"] += 1
+            elif IPv6 in packet:
+                src, dst = packet[IPv6].src, packet[IPv6].dst
+                transport["IPv6"] += 1
+            else:
+                transport["non-IP"] += 1
+                continue
+            if TCP in packet:
+                transport["TCP"] += 1
+            elif UDP in packet:
+                transport["UDP"] += 1
+            else:
+                transport["other transport"] += 1
+            if len(peers) >= 10_000 and (src, dst) not in peers:
+                raise ValueError("peer-pair cardinality cap")
+            peers[(src, dst)] += 1
+    return {
+        "frames_analyzed": scanned,
+        "stopped_at_limit": truncated,
+        "protocols": dict(transport),
+        "top_directional_pairs": peers.most_common(5),
+    }
+```
+
+**What to check:** `PcapReader` avoids loading the entire file at once. `peers` remains bounded by a distinct-pair cap. Truncation status is **not** a statement about whether the underlying capture lost packets before recording. For operational PCAP parsers, validate file metadata/link types and execute against untrusted captures in an isolated environment.
+
+## 12. How packet counts differ from flows and sessions
+
+| Term | Meaning | Why it may be misleading |
+|---|---|---|
+| Captured frame | what capture tool recorded | dropped/filtered packets absent |
+| IP packet | one network-layer datagram | fragmentation changes counts |
+| TCP segment | byte stream transport unit | retransmission repeats data |
+| 5-tuple flow | src/dst addresses, ports, protocol | NAT and reused ports |
+| App transaction | HTTP request/response | may span many segments |
+| TLS session | cryptographic connection state | app payload usually encrypted |
+
+One HTTP response may appear as hundreds of TCP segments; counting packets does not give number of completed user requests. A naive reassembler must handle sequence numbers, retransmissions, gaps and overlaps, so use maintained tools for real stream reconstruction.
+
+### Capture limitations table
+
+| Observation | Can you infer? | Reason |
+|---|---|---|
+| One host sends 1000 DNS queries | yes, if captured and parsed | directly observed |
+| Host is infected | no | benign software can do this |
+| TLS data bytes sent | often yes | encrypted records have lengths |
+| HTTPS message body content | generally no | encryption |
+| No attacker traffic anywhere | no | coverage, encryption, timing gaps |
+| TCP handshake completed | maybe | needs relevant SYN/SYN-ACK/ACK in capture |
+
+## 13. Lab questions with answer keys
+
+**A:** If the capture starts mid-flow, will a TCP session necessarily contain a SYN? No, the earlier handshake may have been missed.
+
+**B:** A flow has 10 retransmitted segments. Does summing TCP payload bytes equal application bytes? No, repeated segments can inflate totals.
+
+**C:** A source IP represents a user? No; NAT, proxy, VPN and shared networks break that assumption.
+
+**D:** Two capture tools count different packet totals. List potential causes: filters, link-type interpretation, capture loss, truncated frames, parser choices, timing.
+
+**E:** Compare an encrypted HTTPS exchange and plaintext HTTP in a loopback/VM lab. Document visible metadata without assuming the encryption is broken.
+
+**F:** Produce one report from your own capture with top five directional peers and a clear "unobserved does not imply absent" limitation statement.

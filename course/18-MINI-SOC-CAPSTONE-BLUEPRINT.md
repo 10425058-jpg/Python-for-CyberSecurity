@@ -229,3 +229,118 @@ Discuss where the FP and FN came from, not only the aggregate score. Increasing 
 10. Which parts are covered by unit tests versus integration and manual review?
 
 **References:** [NIST SP 800-61r3](https://csrc.nist.gov/pubs/sp/800/61/r3/final), [OWASP Logging](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html), [MITRE ATT&CK](https://attack.mitre.org/).
+
+
+## 12. A complete sprint-level implementation plan with acceptance tests
+
+The capstone specification becomes actionable only when each feature has acceptance criteria and a reproducible demonstration.
+
+### Sprint 1 — strict ingestion (one to two weeks)
+
+**Deliverable:** validated synthetic JSONL → immutable event objects.
+
+**Acceptance tests:**
+- A valid one-line record parses and normalizes to UTC.
+- Invalid UTF-8, missing required keys and duplicate JSON keys cause clear failure.
+- Line numbers appear in errors.
+- A line exceeding the byte cap fails before full materialization.
+- The CLI never reports "zero suspicious events" after a parsing failure.
+
+**Data contract:** fields, types, time zones, source IDs and event ID rules are documented. Preserve a reference to the original line. Distinguish raw bytes from normalized data.
+
+### Sprint 2 — correlation and retention (one to two weeks)
+
+**Deliverable:** per-actor event-time rolling windows and deduplication.
+
+**Acceptance tests:**
+- t=0, t=30, t=60 triggers an inclusive 60-second threshold 3.
+- t=0, t=30, t=61 does not use the expired t=0.
+- A duplicate `(source,event_id)` does not count twice.
+- A global time regression is either rejected or buffered by a documented policy.
+- Actor and per-actor queue caps are enforced with clear failures.
+- The rule re-arms only when active count falls below the threshold.
+
+**Tradeoff:** exact deduplication forever requires unbounded memory or persistent state. A finite TTL or disk index can bound cost but allows older replays; document scope and limitations.
+
+### Sprint 3 — reports and evidence (one to two weeks)
+
+**Deliverable:** staged, then atomically committed JSONL report with explainable findings.
+
+**Acceptance tests:**
+- A malformed record after one valid alert does not replace an existing complete report.
+- Finding includes rule version, actor, time, supporting source-qualified IDs and "review" status.
+- Sensitive tokens and raw credentials never appear in logs.
+- An empty output is accompanied by a completion record (even when zero alerts).
+- Database/report errors produce nonzero process status and are visible to operators.
+
+**Important limitation:** filesystem atomic replace is not equivalent to full crash durability, and metadata/permissions may not be preserved.
+
+### Sprint 4 — analyst assessment and evaluation (one to two weeks)
+
+**Deliverable:** labeled toy scenarios, metrics, triage runbook and report.
+
+Use a table of 100 labeled scenarios:
+- 10 suspicious, 90 benign (toy labels only).
+- TP=8, FN=2, FP=9, TN=81.
+- Precision ≈0.471, recall=0.8, F1≈0.593.
+Compare thresholds 2/3/5; discuss alert volume and missed slow failures.
+
+**Do not claim** real-world detector performance from this synthetic exercise.
+
+### Sprint 5 — production-readiness gap assessment
+
+Before any connection to real telemetry:
+- Asset/data ownership and written collection authorization.
+- Privacy and retention policies.
+- Authentication, access control, secret management.
+- Source provenance, clock synchronization, API rate limits.
+- Input/output resource budgets under adversarial scale.
+- Runbooks, rollback and human approval for response.
+- Regression tests and review across Python versions.
+- Threat model for compromised collectors and adversarial log messages.
+
+This is a review checklist, not permission to deploy a lab prototype against someone else's systems.
+
+## 13. Mapping exact source files to architecture
+
+| Stage | Current learning implementation | Next engineering task |
+|---|---|---|
+| Input | [mini_soc_pipeline.py](../examples/mini_soc_pipeline.py) | separately model source provenance and limits |
+| Parsing | `parse_event` and `read_events` | strict schema version and source-aware retention |
+| Detection | `detect_bursts` | late event policy, TTL and streaming metrics |
+| Reporting | `write_findings_atomic` | typed alerts, completeness receipt and audit |
+| Tests | [test_deep_examples.py](../tests/test_deep_examples.py) | fault injection and synthetic load tests |
+| Workshop | [Mini SOC lab](../workshops/02-MINI-SOC-DETECTION.md) | student report, boundary tests and peer review |
+
+## 14. Senior-engineer design-review questions
+
+1. If an identity-provider event arrives 10 minutes late, what exactly happens?
+2. How does a malicious username containing JSON escape characters affect reporting?
+3. What does the service do if it runs out of disk space halfway through export?
+4. Are event IDs stable and authenticated, or can a source generate duplicates?
+5. Which metrics distinguish sensor outage from "no incidents"?
+6. How will you retain raw evidence without making it public?
+7. What prevents replayed records from triggering repeated false alerts?
+8. Which permissions can your ingestion service actually exercise?
+9. What is the chosen overflow policy for actor cardinality?
+10. Can you demonstrate graceful shutdown and correct output under fault injection?
+
+**Portfolio requirement:** answers belong in `docs/architecture.md`, `docs/threat-model.md` and `docs/evaluation.md`; claims without tests or evidence are incomplete.
+
+## 15. A worked incident summary template
+
+```text
+Case: LAB-2026-001
+Scope: Synthetic authentication telemetry; no real accounts touched
+Observed: Three unique failures for one actor in inclusive 300-second window
+Rule: AUTH-BURST-001, version and threshold recorded
+Evidence: source-qualified event IDs, original log references and hashes
+Data quality: 0 parse errors, no late events (for this controlled sample)
+Interpretation: Review candidate, not proof of unauthorized access
+Benign alternatives: password typos, stale device credentials, scheduled test
+Needed corroboration: MFA/session/device data and source clock assurance
+Response: Analyst review only; no autonomous account action
+Limitations: Synthetic input, no live identity-provider data
+```
+
+The write-up should explain *why* each observed event supports the hypothesis and what facts would falsify it. Do not present generic SOC jargon as a substitute for a measured experiment.

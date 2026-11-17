@@ -146,3 +146,118 @@ Only test within authorization. If you discover a real vulnerability, document s
 - Why does "1000 fuzz cases passed" not mean "all inputs safe"?
 
 **References:** [CVE Program](https://www.cve.org/), [FIRST CVSS](https://www.first.org/cvss/), [Hypothesis](https://hypothesis.readthedocs.io/).
+
+
+## 11. Worked vulnerability-management pipeline: from advisories to justified action
+
+A dependency scanner reports that a project uses an affected package version. What should your Python automation do next? It should **not** automatically claim exploitation or forcibly replace a package. It should establish applicability, source, business context and a remediation decision.
+
+### Define a minimal finding
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class VulnerabilityRecord:
+    advisory_id: str
+    component: str
+    deployed_version: str
+    affected: bool
+    exposed: bool
+    fix_available: bool
+
+def triage(record: VulnerabilityRecord) -> str:
+    if not record.affected:
+        return "not applicable to this deployed version"
+    if record.exposed and record.fix_available:
+        return "high priority for human-reviewed patch plan"
+    if record.exposed and not record.fix_available:
+        return "investigate mitigations and documented exception"
+    return "validate exposure and schedule remediation review"
+
+finding = VulnerabilityRecord(
+    "LAB-ADV-1", "toy-library", "1.0", True, True, False
+)
+assert "mitigations" in triage(finding)
+```
+
+This is a **decision aid**, not a CVSS calculator, risk score or vulnerability feed. Real prioritization considers exploit activity, asset criticality, compensating controls, patch outage risk and organizational timelines.
+
+### Explain version comparison
+
+The string `"1.10"` is **not** lexically smaller than `"1.2"` in version semantics; Python string comparison is not sufficient. Python ecosystems use [PEP 440](https://peps.python.org/pep-0440/) version semantics. For Python packages, use the maintained `packaging.version.Version` where appropriate, and inspect the advisory's exact affected range and pre-release rules. Do not assume one versioning scheme applies to Docker images, operating-system packages and Python wheels.
+
+```python
+# Optional dependency: python -m pip install packaging
+from packaging.version import Version
+assert Version("1.10") > Version("1.2")
+assert Version("2.0rc1") < Version("2.0")
+```
+
+**Supply-chain nuance:** a version number does not prove the installed artifact's integrity. Package origin, hashes/signatures and build provenance are separate concerns.
+
+## 12. Fuzzing a *pure*, local-only input parser
+
+A parser that reads ports from a CLI should reject invalid inputs efficiently. Fuzzing explores edge cases, but only within a controlled environment you own.
+
+```python
+def parse_port(raw: str) -> int:
+    if type(raw) is not str or not 1 <= len(raw) <= 5:
+        raise ValueError("expected short text")
+    if not raw.isascii() or not raw.isdecimal():
+        raise ValueError("only ASCII digits allowed")
+    value = int(raw)
+    if not 1 <= value <= 65535:
+        raise ValueError("out of port range")
+    return value
+```
+
+### Exhaustive local boundary test
+
+```python
+assert parse_port("1") == 1
+assert parse_port("65535") == 65535
+for value in ("", "0", "65536", "1e3", "-1", "１２３", "443x"):
+    try:
+        parse_port(value)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"invalid value accepted: {value!r}")
+```
+
+### Properties for fuzzing
+- All accepted values are integers in [1,65535].
+- Invalid types and oversized text are rejected.
+- Execution does not call the network or filesystem.
+- The algorithm has bounded work for bounded input.
+- Unknown errors are recorded; don't treat them as successful validation.
+
+A tool like Hypothesis can generate boundary cases and shrink failures to minimal reproductions. Pair fuzzing with static review and explicit threat models: neither is sufficient alone.
+
+## 13. Resource-exhaustion details that deserve their own tests
+
+| Input | Risk | Controlled experiment |
+|---|---|---|
+| 1 MB text field | allocation/log flooding | reject before storing |
+| Deeply nested JSON | parser recursion/memory | limit body and complexity |
+| Huge integer string | expensive conversion | text length cap before `int` |
+| Many distinct actors | unbounded dictionary | cardinality cap |
+| Adversarial regex input | catastrophic backtracking | bounded data and safer grammar |
+| ZIP with high expansion ratio | disk exhaustion | inspect sizes, never blindly extract |
+
+**Failure semantics:** a security tool must distinguish "no findings in complete scan" from "scan incomplete or validation failed". This distinction is often more valuable than an additional detection heuristic.
+
+## 14. Self-assessment
+
+**Q1:** Is a CVSS 9.0 necessarily more urgent than a CVSS 7.0? No; business context, reachability and active exploitation can dominate urgency.
+
+**Q2:** Can you compare `"1.10"` and `"1.2"` as strings? No; use correct version semantics.
+
+**Q3:** If 10,000 fuzz cases pass, is the parser proven secure? No; the tested input space is finite and the security model broader.
+
+**Q4:** Why test malformed input *and* valid boundary values? Because accepting legitimate edge inputs and rejecting invalid ones are separate obligations.
+
+**Q5:** Why do you need an asset inventory before processing vulnerabilities? Advisories must be matched to deployed software and configurations.
+
+**Practice:** produce a sample remediation ticket with source evidence, affected component, actual exposure, mitigation options, owner, deadline, validation plan, rollback and documented residual risk.

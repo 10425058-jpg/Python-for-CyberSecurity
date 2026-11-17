@@ -163,3 +163,90 @@ Lab: You start a local server, issue one HTTP GET, stop the server and retry. A 
 What is the difference between TCP and UDP? Why is `recv(1024)` insufficient as an application parser? What does TLS establish? What does an HTTP 403 mean? Why does an open port not demonstrate a vulnerability?
 
 **References:** [Python sockets](https://docs.python.org/3/library/socket.html), [Python SSL](https://docs.python.org/3/library/ssl.html), [Wireshark](https://www.wireshark.org/docs/), [OWASP SSRF](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
+
+
+## 10. A complete TCP framing walkthrough: why one `recv` cannot parse one message
+
+A monitoring client connects to a locally owned service. The server sends two JSON records, each preceded by a four-byte big-endian unsigned length. TCP does not preserve the sender's `send` boundaries: the receiver may get a header fragment, an entire record, or bytes from multiple records in one read.
+
+### Build a loopback-only echo lab
+
+```python
+import socket
+import struct
+
+MAX_FRAME = 4096
+
+def receive_exact(sock: socket.socket, count: int) -> bytes:
+    if type(count) is not int or not 0 <= count <= MAX_FRAME:
+        raise ValueError("invalid byte count")
+    parts = bytearray()
+    while len(parts) < count:
+        chunk = sock.recv(count - len(parts))
+        if not chunk:
+            raise EOFError("connection closed during frame")
+        parts.extend(chunk)
+    return bytes(parts)
+
+def receive_message(sock: socket.socket) -> bytes:
+    size = struct.unpack("!I", receive_exact(sock, 4))[0]
+    if size > MAX_FRAME:
+        raise ValueError("peer declared oversized frame")
+    return receive_exact(sock, size)
+
+def send_message(sock: socket.socket, body: bytes) -> None:
+    if not isinstance(body, bytes) or len(body) > MAX_FRAME:
+        raise ValueError("payload must be bounded bytes")
+    sock.sendall(struct.pack("!I", len(body)) + body)
+```
+
+**Trace:** header `00 00 00 05` means 5 bytes. If `recv(4)` returns only 2 bytes, `receive_exact` loops until all 4 have arrived or EOF occurs. If the header declares 5000, reject *before reading or allocating that body*. The application still needs an overall deadline; `sock.settimeout(...)` alone is an idle-operation timeout, not always a job deadline.
+
+### Socket lifecycle and scope
+
+```python
+# Local-only concept: use a test listener bound to 127.0.0.1,
+# rather than arbitrary user-controlled remote hostnames.
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+    server.bind(("127.0.0.1", 0))  # OS chooses a local ephemeral port
+    server.listen(1)
+    chosen_port = server.getsockname()[1]
+    assert 1 <= chosen_port <= 65535
+```
+
+This snippet demonstrates binding, not a fully functioning server/client. In a real lab, run the listener and client as separate processes/tasks so one can accept while the other connects.
+
+## 11. DNS and TLS trust-boundary cases
+
+**Scenario:** a web app fetches a URL supplied by a caller. A regex checks that it begins with a familiar domain. Is this safe? No. URL parsers, redirects, DNS rebinding, IPv6 representation and actual connected IP can undermine naive checks. For secure server-side fetchers, prefer fixed destinations and network-level egress controls, then validate resolution and every redirect/connection.
+
+| Control | Protects against | Does not by itself solve |
+|---|---|---|
+| Strict scheme/host allowlist | obvious unauthorized destinations | DNS rebinding |
+| DNS resolution checks | unexpected IP ranges at that moment | changed answers at connect |
+| Connect destination validation | unexpected final IP when correctly enforced | compromised trusted endpoint |
+| Outbound firewall | prohibited internal address ranges | application authorization |
+| TLS certificate validation | unauthenticated server identity | vulnerability of authenticated server |
+| Per-request timeout + byte cap | stuck/excessive response | incorrect business logic |
+
+TLS validates a connection to an expected server identity under trust-store assumptions. A TLS certificate does **not** say a service is authorized to receive your user's data. Correct authentication and authorization remain separate.
+
+### Correctly interpret a port result
+
+A successful TCP connection to 127.0.0.1:8765 proves only that a local listener accepted a handshake at that moment. It does not tell you the software version, application protocol, certificate configuration, ownership or exploitability. A failed connection could mean no listener, firewall filtering, timeout or transient network state.
+
+## 12. Exercises with expected observations
+
+**A:** Create a local client/server pair on loopback and send the same 5-byte message in 1-byte chunks. The reader must reconstruct the original bytes. Test premature EOF.
+
+**B:** Demonstrate how `int.from_bytes(b"\x01\x00","big")` differs from `"little"`. Answer: 256 versus 1.
+
+**C:** Write a report for an observed port 8765 accepting a connection, including what is *not* proven.
+
+**D:** Threat-model an API accepting arbitrary URLs; list three application controls and one network-level control. Explain why each is distinct.
+
+**E:** Check `ssl.create_default_context()` and explain the roles of CA trust, hostname verification and certificate expiration. Never disable verification just to pass a demo.
+
+**F:** For an allowed hostname that resolves to both IPv4 and IPv6, explain why checks must consider **all** candidate addresses and the actual connected peer.
+
+**Reference:** [Python socket docs](https://docs.python.org/3/library/socket.html), [OWASP SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).

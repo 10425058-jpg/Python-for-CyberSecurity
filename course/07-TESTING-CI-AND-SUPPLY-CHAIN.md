@@ -177,3 +177,87 @@ Test cases must assert **correct rejection**, not merely that no crash occurred.
 **E:** Design an end-to-end offline test for the log detector including malformed input, duplicates and time skew. Explain what it cannot establish about a live SOC.
 
 **References:** [unittest](https://docs.python.org/3/library/unittest.html), [Python packaging](https://packaging.python.org/), [pip-audit](https://github.com/pypa/pip-audit), [GitHub Actions security](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions).
+
+
+## 11. Advanced testing lab: prove *failure behavior*, not just happy paths
+
+Suppose a parser processes an incident dataset and emits findings incrementally. It encounters invalid JSON after writing its first alert. What is the contract? Does a report contain partially valid rows? Does a CLI return a successful exit code? Does a human reviewing the output think the scan was complete?
+
+For a safety-oriented educational pipeline, **stage the report and commit it only after complete successful parsing**. This is a stronger guarantee than merely asserting a function returns the right number of alerts.
+
+### Test an invariant rather than implementation details
+
+```python
+import tempfile
+import unittest
+from pathlib import Path
+from examples.mini_soc_pipeline import write_findings_atomic
+
+GOOD = b'{"timestamp":"2026-01-01T00:00:00Z",' \
+       b'"actor":"a","action":"login_failure"}\n'
+BAD = b'not-json\n'
+
+class AtomicityTest(unittest.TestCase):
+    def test_bad_source_does_not_replace_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "input.jsonl"
+            report = Path(directory) / "report.jsonl"
+            report.write_text("previous complete report\n", encoding="utf-8")
+            source.write_bytes(GOOD + GOOD + GOOD + BAD)
+            with self.assertRaises(ValueError):
+                write_findings_atomic(source, report, threshold=3)
+            self.assertEqual(
+                report.read_text(encoding="utf-8"),
+                "previous complete report\n",
+            )
+```
+
+**What it proves:** a known malformed input prevents replacement of the existing report in this scenario. **What it does not prove:** crash durability under power loss, resistance to malicious filesystem races, correct triage decisions on real data, or absence of other bugs.
+
+## 12. Threat-model the CI pipeline itself
+
+| Threat | Risk | Example mitigation | Verification |
+|---|---|---|---|
+| PR modifies workflow | job gains secrets | minimal token scopes, protected environments | inspect workflow diff |
+| Third-party action compromised | malicious code on runner | pin reviewed action commit SHA; monitor advisories | provenance review |
+| Dependency typosquatting | install executes untrusted code | audited locked requirements, trusted index | dependency review |
+| Cache poisoning | malicious artifact reused | restrict cache sharing, isolate trust levels | CI configuration test |
+| Credentials printed in failure | token disclosure | protected secret flow, redacted logging | safe log test |
+| CI cannot access network | tests break for wrong reasons | offline deterministic unit tests | run without network |
+
+Tests should not require connecting to production services. For deployment integrations, use limited scoped test accounts and explicit permissions.
+
+### Verification commands
+
+```bash
+python -m unittest discover -s tests -v
+python -m compileall -q examples tests
+python -m examples.strict_frame
+```
+
+Optional maintained tools include `ruff`, `mypy`, `pip-audit` and `bandit`. Each has limitations; do not equate "no findings" with "secure."
+
+## 13. Mutation testing as a thought experiment
+
+Take a threshold rule `if count >= 3`. Change it intentionally to `if count > 3`. If all tests still pass, your tests missed an **inclusive-boundary requirement**. Good tests target invariants:
+- Exactly 2 failures: no alert.
+- Exactly 3: alert.
+- A fourth within window: behavior according to suppression policy.
+- Third exactly 300 seconds from first: include if policy is inclusive.
+- A failure at 301 seconds: first event expires.
+- Duplicates: count according to explicit ID policy.
+- Corruption after valid rows: fail visibly and avoid false "all clear."
+
+## 14. Exercise ladder with answer checks
+
+**A:** Write a test for `parse_event` rejecting duplicate JSON keys. A reliable parser should not silently choose a value.
+
+**B:** Introduce a wrong timestamp offset and demonstrate how an apparently passing test could produce the wrong incident order.
+
+**C:** Mock a `datetime.now` dependency by injecting a clock function; do not patch global system time.
+
+**D:** Define two integration tests for SQLite write transactions and rollback after an invalid record.
+
+**E:** Design a regression test for a bug discovered in production. Describe how sanitized synthetic fixtures avoid exposing private user data.
+
+**Evaluation rubric:** each test should state the invariant, data conditions, expected error/return type and why it matters for security. Maintain a small "known limitations" section for properties that tests do not establish.

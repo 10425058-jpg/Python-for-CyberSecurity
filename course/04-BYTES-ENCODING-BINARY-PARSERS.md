@@ -168,3 +168,87 @@ A more mature test suite should vary lengths, unexpected types, Unicode and extr
 **Exercise D:** write unit tests for every rejection path in `parse_toy_frame` and show that all errors are predictable, not crashes.
 
 **References:** [struct](https://docs.python.org/3/library/struct.html), [socket](https://docs.python.org/3/library/socket.html), [Unicode HOWTO](https://docs.python.org/3/howto/unicode.html).
+
+
+## 10. Detailed protocol audit: parsing header length is not sufficient
+
+The six-byte toy header from this chapter is intentionally simple: magic (2), version (1), type (1), length (2). Real protocol parsing also needs a transport layer, strict resource limits, integrity/authentication, and uncertainty handling.
+
+**Threat model:** a peer may send arbitrary bytes, declare a huge length, disconnect mid-frame, stall for minutes, send concatenated frames, or trick a parser with duplicate JSON keys. Our parser must not execute contents, must not read unbounded amounts and must report exactly which invariant failed.
+
+### Binary structure and example trace
+
+```text
+Byte offsets:
+00  01  02  03  04  05 | 06...N
+ S   C   01  02   00  0b | (11 payload bytes)
+ |magic|version|kind|length| payload |
+
+Header: 53 43 01 02 00 0b
+Magic  = b"SC"
+Version = 1
+Kind    = 2
+Length  = 11 (big-endian)
+```
+
+Consider why `!` in `struct.unpack("!2sBBH", header)` matters: for bytes `01 00`, a two-byte big-endian length is 256, while little-endian interprets 1. An attacker exploiting an endianness disagreement might bypass one component's size checks.
+
+### Full client-side decoder with exact framing
+
+```python
+import asyncio
+import struct
+import json
+
+MAX_BYTES = 1024
+
+async def read_lab_frame(reader: asyncio.StreamReader) -> dict:
+    header = await asyncio.wait_for(reader.readexactly(6), timeout=2)
+    magic, version, kind, count = struct.unpack("!2sBBH", header)
+    if magic != b"SC" or version != 1 or kind not in (1, 2):
+        raise ValueError("invalid toy protocol header")
+    if count > MAX_BYTES:
+        raise ValueError("declared payload exceeds limit")
+    body = await asyncio.wait_for(reader.readexactly(count), timeout=2)
+    value = json.loads(body.decode("utf-8", errors="strict"))
+    if type(value) is not dict:
+        raise ValueError("payload must be an object")
+    return {"kind": kind, "data": value}
+```
+
+This is a learning-only read helper, **not** a complete secure protocol. The two separate timeouts are **not a total deadline** (a peer may exploit multiple stages); a production service needs a *single overall timeout*, connection limits, strict JSON handling, authentication and error integration.
+
+### Test the transport separately from the parser
+
+```python
+from examples.strict_frame import encode_frame, decode_frame
+
+valid = encode_frame(2, {"event":"training"})
+assert decode_frame(valid)["message_type"] == 2
+
+for bad in [valid[:-1], valid + b"!", b"XY" + valid[2:]]:
+    try:
+        decode_frame(bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("bad frame was accepted")
+```
+
+**Why tests belong at two layers:** `decode_frame` verifies an already complete byte string. `read_lab_frame` verifies framed I/O over an asynchronous byte stream. Passing one set of tests does not prove the other is correct. Particularly test partial transport reads, cancellation and EOF.
+
+## 11. Attacker-controlled JSON ambiguities
+
+JSON keys can be duplicated in a raw document. Python's default `json.loads` accepts the duplicate and generally keeps the last value; two downstream components using different parsers may disagree about an authorization field. In strict security contexts, reject duplicate keys with `object_pairs_hook`. The [reference implementation](../examples/strict_frame.py) does that and rejects nonstandard NaN/Infinity constants.
+
+A byte-size cap protects against one class of exhaustion, but not arbitrary computation complexity or deeply nested data. Consider JSON nesting, supported max object entries, timeouts, and upstream body limits.
+
+## 12. Exercises and answers
+
+1. **Manual decode:** `53 43 01 01 00 05`. The header declares **5** payload bytes. If only 4 exist, reject. Why? Truncated frame violates the wire contract.
+2. **Unicode:** JSON `{"x":"é"}` is longer in UTF-8 than its visible character count. Compute the exact bytes in Python rather than assuming ASCII.
+3. **TCP:** if the sender writes two frames with two `sendall` calls, can the receiver get both in one `recv`? Yes; TCP does not preserve write boundaries.
+4. **Security:** an unauthenticated peer sends a syntactically valid frame. Is it authorized? No; parsing data and authorizing a sender are separate tasks.
+5. **Stress:** fuzz `decode_frame` locally with truncated prefixes of valid frames; every prefix shorter than full frame must reject. Run with CPU/time limits.
+
+**Design review:** where would you insert a message authentication check, and which exact bytes would it cover? Consider header fields, message type, replay prevention and key identity. Use a vetted protocol instead of inventing production cryptography.

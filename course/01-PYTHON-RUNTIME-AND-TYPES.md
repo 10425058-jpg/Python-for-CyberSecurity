@@ -202,3 +202,112 @@ A: the outer list is copied, but the inner list is still shared. B: use explicit
 5. Why do we keep original evidence bytes separate from derived strings?
 
 **Further reading:** [Python data model](https://docs.python.org/3/reference/datamodel.html), [built-in types](https://docs.python.org/3/library/stdtypes.html), [Unicode HOWTO](https://docs.python.org/3/howto/unicode.html).
+
+
+## 10. Deep case study: why a JSON security event can quietly change meaning
+
+Consider the following API request body that is decoded by `json.loads`:
+
+```json
+{"enabled": true, "max_attempts": 5, "user": "alex"}
+```
+
+The result is a dictionary with three key/value pairs. JSON `true` becomes Python `True`. The subtle problem: `True == 1` is true because `bool` is a subclass of `int`. If a policy accepts an integer using `isinstance(value, int)`, it also accepts booleans. Security requirements often distinguish "one attempt" from "enabled". A trusted boundary must test the exact expected kind of value.
+
+### Fully worked, import-safe validator
+
+```python
+from dataclasses import dataclass
+import json
+
+@dataclass(frozen=True)
+class LoginPolicy:
+    enabled: bool
+    max_attempts: int
+    user: str
+
+def parse_login_policy(raw: bytes) -> LoginPolicy:
+    if type(raw) is not bytes or len(raw) > 2048:
+        raise ValueError("JSON body must be at most 2048 bytes")
+    try:
+        value = json.loads(raw.decode("utf-8", errors="strict"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid UTF-8 JSON") from exc
+
+    if type(value) is not dict or set(value) != {
+        "enabled", "max_attempts", "user"
+    }:
+        raise ValueError("exact object schema required")
+    enabled, attempts, user = (
+        value["enabled"], value["max_attempts"], value["user"]
+    )
+    if type(enabled) is not bool:
+        raise ValueError("enabled must be a boolean")
+    if type(attempts) is not int or not 1 <= attempts <= 20:
+        raise ValueError("max_attempts must be an integer in [1, 20]")
+    if type(user) is not str or not 1 <= len(user) <= 64:
+        raise ValueError("user must be nonempty text up to 64 characters")
+    return LoginPolicy(enabled=enabled, max_attempts=attempts, user=user)
+
+valid = parse_login_policy(
+    b'{"enabled":true,"max_attempts":5,"user":"alex"}'
+)
+assert valid.max_attempts == 5
+
+for invalid in [
+    b'{"enabled":1,"max_attempts":5,"user":"alex"}',
+    b'{"enabled":true,"max_attempts":true,"user":"alex"}',
+    b'{"enabled":true,"max_attempts":0,"user":"alex"}',
+    b'{"enabled":true,"max_attempts":5,"user":null}',
+]:
+    try:
+        parse_login_policy(invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"unexpected acceptance: {invalid!r}")
+```
+
+**Line-by-line reasoning:** (1) check raw bytes before decoding; (2) decode strictly so corrupted evidence does not disappear; (3) parse a structured JSON value; (4) verify exact fields, not "looks like a dict"; (5) validate each field in the order **type → range/length → semantics**; (6) only then construct a verified domain model. The `dataclass` itself does not enforce the types at runtime.
+
+**Important limitation:** the standard parser accepts duplicate keys and some non-standard numeric constants unless configured to reject them; use a strict parser hook at high-trust boundaries (see Chapter 05). The 2 KB cap bounds total input bytes, but a production endpoint also needs request framing/body limits upstream.
+
+### Trace table
+
+| Input for `max_attempts` | Python type after JSON | Naive `isinstance(..., int)` | Strict result |
+|---|---|---|---|
+| `5` | `int` | accepts | accepts |
+| `true` | `bool` | accepts incorrectly | rejects |
+| `5.0` | `float` | rejects | rejects |
+| `"5"` | `str` | rejects | rejects |
+| `-1` | `int` | accepts type | rejects range |
+| `null` | `NoneType` | rejects | rejects |
+
+### Another subtlety: immutable names versus immutable data
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class AlertRecord:
+    labels: list[str]
+
+a = AlertRecord(labels=["review"])
+a.labels.append("confirmed")  # ALLOWED: list is still mutable
+assert a.labels == ["review", "confirmed"]
+```
+
+Instead, use an immutable tuple for the nested field and ensure the boundary validates it. "Frozen dataclass" is not synonymous with "deeply immutable".
+
+## 11. Four diagnostic exercises, with answer logic
+
+**Exercise A (predict):** After `a = [[1]]; b = a[:]; b[0].append(2)`, what is `a`? Answer: `[[1, 2]]` because list slicing copies only the outer list.
+
+**Exercise B (debug):** A security rule reads `attempts = payload.get("attempts") or 10`. Why is `0` mapped to 10? Answer: `0` is falsy. Check presence with `"attempts" in payload` and validate zero explicitly.
+
+**Exercise C (build):** Validate a username that may include accented characters while enforcing a **byte** limit of 128 UTF-8 bytes. Compare `len(name)` against `len(name.encode("utf-8"))`; explain why they differ. Preserve original bytes if the value is forensic evidence.
+
+**Exercise D (design):** Construct a normalization policy for email-like user identifiers. Which case differences and Unicode variants will you preserve? Answer: provider-dependent semantics; blindly lowercasing all identities can merge distinct accounts. Document rules, original and canonical fields.
+
+### Independent mastery check
+Without running the code, predict which values will be rejected and *why*. Then run it and compare your prediction with observed output. If you cannot explain strict typing, Unicode boundaries and aliasing, repeat the chapter before continuing to parser design.

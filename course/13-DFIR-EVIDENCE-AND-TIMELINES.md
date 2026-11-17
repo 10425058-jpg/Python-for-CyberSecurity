@@ -189,3 +189,94 @@ A report written for executives should say what decision is needed; technical ap
 **Q:** How does NIST Rev. 3 differ from a rigid sequential incident life-cycle depiction? **A:** It integrates incident response into broader risk governance and CSF functions, with organizational preparation and improvement as ongoing work.
 
 **References:** [NIST SP 800-61 Rev. 3](https://csrc.nist.gov/pubs/sp/800/61/r3/final), [Python hashlib](https://docs.python.org/3/library/hashlib.html), [Python datetime](https://docs.python.org/3/library/datetime.html).
+
+
+## 12. Full DFIR exercise: preserve, normalize and explain a three-event timeline
+
+You receive two **synthetic** logs collected from an isolated VM. One uses UTC; one uses UTC+07:00. An analyst asks whether a successful login happened after two failures.
+
+The question is deceptively simple: event timestamps are source claims, not automatically authoritative facts. An incident conclusion should also document clock synchronization, collection provenance and alternative benign explanations.
+
+### The input
+
+```text
+source-a.jsonl: {"timestamp":"2026-01-01T10:00:00Z","event_id":"a1","actor":"alex","action":"login_failure"}
+source-b.jsonl: {"timestamp":"2026-01-01T17:01:00+07:00","event_id":"b1","actor":"alex","action":"login_failure"}
+source-a.jsonl: {"timestamp":"2026-01-01T10:02:00Z","event_id":"a2","actor":"alex","action":"login_success"}
+```
+
+The correct UTC order is 10:00 failure → 10:01 failure → 10:02 success. This **does not prove** that an attacker signed in. A legitimate user might have typed the wrong password twice.
+
+### Minimal verified transformation
+
+```python
+from datetime import datetime, timezone
+
+def normalized_time(original: str) -> datetime:
+    if type(original) is not str or len(original) > 64:
+        raise ValueError("bad timestamp representation")
+    try:
+        value = datetime.fromisoformat(original.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("bad timestamp syntax") from exc
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("offset required")
+    return value.astimezone(timezone.utc)
+
+timeline = [
+    ("a1", "2026-01-01T10:00:00Z", "failure"),
+    ("b1", "2026-01-01T17:01:00+07:00", "failure"),
+    ("a2", "2026-01-01T10:02:00Z", "success"),
+]
+ordered = sorted(timeline, key=lambda item: normalized_time(item[1]))
+assert [event_id for event_id, _, _ in ordered] == ["a1", "b1", "a2"]
+```
+
+The code checks timestamp parsing but not provenance or source integrity. A full forensic pipeline records the *original raw bytes*, a hash of acquired files, collection method, tool version and transformation details.
+
+## 13. Evidence chain-of-custody table
+
+| Field | What you record | Why it matters |
+|---|---|---|
+| Evidence ID | stable local case ID | track artifacts unambiguously |
+| Origin | VM, path, volume/source | explain source |
+| Authority | approved lab/case scope | demonstrate permitted collection |
+| Collector & time | UTC and role | accountability |
+| Acquisition method | snapshot/export/tool version | reproducibility |
+| SHA-256 | computed from acquired exact bytes | integrity comparison |
+| Transfer history | actor/time/method | custody |
+| Work product | normalized timeline, report | distinguish derived analysis |
+
+A SHA-256 digest **does not** prove a file's origin or that its statements are truthful. File timestamps may have been altered by normal activity or adversaries; `ctime` is platform-dependent.
+
+### Interpret evidence without overstating certainty
+
+Write separate headings:
+- **Observation:** two failures and a success appear in provided logs.
+- **Interpretation:** sequence is consistent with a person retrying credentials.
+- **Alternative:** benign password correction, scripted test or compromised credential use.
+- **Missing evidence:** MFA outcomes, source device, authoritative identity-provider logs, clock synchronization.
+- **Confidence:** limited because the lab records alone do not identify intent.
+
+## 14. Practicum: chain-of-custody and validation
+
+1. Generate the three synthetic JSONL records locally.
+2. Compute SHA-256 for each file using chunked reading; record actual values.
+3. Make read-only working copies; verify hashes match.
+4. Normalize timestamps; keep original strings beside normalized UTC.
+5. Add an event missing an offset; reject it, don't guess UTC.
+6. Add an event with a timestamp earlier than prior ingest order; discuss source-time ordering.
+7. Create a one-page report with observable facts and alternative explanations.
+8. Explain how any response action (e.g., account revocation) would require the organization's authority and evidence-preservation policy.
+
+### Assessment and solution cues
+
+**Q:** Why might turning off a potentially compromised computer damage an investigation? Volatile memory, process/network state and temporary keys disappear; operational safety may still require shutdown under policy.
+
+**Q:** How does "the log states..." differ from "the attacker did..."? The former describes evidence; the latter asserts attribution and intent requiring corroboration.
+
+**Q:** Is it correct to merge three streams by **ingest** timestamp alone? Not necessarily. Ingest time may be delayed and is different from event time; preserve both.
+
+**Q:** Is an unchanged hash enough to prove clean acquisition? No. It supports bytes being unchanged between comparisons, not source truth or chain of custody.
+
+**Official standard:** [NIST SP 800-61 Revision 3 (April 2025)](https://csrc.nist.gov/pubs/sp/800/61/r3/final) integrates incident response into organization-wide cybersecurity risk management.
