@@ -1,12 +1,17 @@
 # Full curriculum index
 
-> **The expanded third-edition course has its own comprehensive index:** [22 deep-dive lessons with annotated code and worked exercises](../course/README.md). The chapters below are quick-reference companions, not the main long-form lessons.
+> **The expanded third-edition course has its own comprehensive index:** [22 deep-dive lessons with annotated code and worked exercises](../course/README.md). The `python/` chapters below have now been expanded into a full foundational textbook; the `security/` pages remain compact companions.
 
 ## Pedagogical quality upgrade
 
 - [All 22 Deep Dive masterclasses](../course/README.md) focus on difficult misconceptions, real failure paths and testable reasoning.
 - [Masterclass editorial review criteria](EDITORIAL-QUALITY-STANDARD.md): learning outcomes, explanation, contrasting cases, independent tasks and validation.
 - [Runnable masterclass regression suite](../tests/test_masterclass_chapters.py): executes one new standalone exercise for each chapter.
+
+## Expanded Python foundation textbook
+
+- [Python textbook 00–11](../python/README.md): foundations, algorithms, functions, I/O, tests, OOP, iterators, concurrency, OS, packaging and internals.
+- [Textbook editorial rubric](PYTHON-FOUNDATIONS-TEXTBOOK-RUBRIC.md) and [12-example regression suite](../tests/test_python_textbook_chapters.py).
 
 ## Part I — Programming foundations (12 chapters)
 | Chapter | Key competencies | Practice artifact |

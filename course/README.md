@@ -1,6 +1,6 @@
 # Python for Cybersecurity — Deep Dive (Expanded Third Edition)
 
-**All 22 chapters have been expanded with additional executable case studies, trace tables, failure-mode discussion, exercises and solution cues.** This is the detailed, explanation-first track. The short pages in `python/` and `security/` are retained as **quick-reference overviews**. The units here contain the deeper conceptual lessons, explanatory traces, annotated Python, security failure modes, worked checks and end-of-unit assignments. Every active exercise is offline or loopback-only, using authorized/synthetic data.
+**All 22 chapters have been expanded with additional executable case studies, trace tables, failure-mode discussion, exercises and solution cues.** This is the detailed, explanation-first track. The [`python/` modules](../python/README.md) now provide full beginner-to-advanced textbook lessons; the `security/` pages remain quick-reference overviews. The units here contain the deeper conceptual lessons, explanatory traces, annotated Python, security failure modes, worked checks and end-of-unit assignments. Every active exercise is offline or loopback-only, using authorized/synthetic data.
 
 ## Applied practice with 22 labs and 100 answers
 
