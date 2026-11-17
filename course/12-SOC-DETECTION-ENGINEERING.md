@@ -17,6 +17,55 @@ Build a controlled, testable pipeline with:
 - False-positive and coverage evaluation.
 - Analyst triage and response workflow.
 
+## Masterclass — the base-rate trap in SOC alert quality
+
+A SOC rule may detect 90% of true incidents yet waste most analyst time on benign events. The reason is **prevalence**: when true incidents are rare, even a small false-positive rate applies to a very large benign population. You must report recall, false-positive rate and **precision** together.
+
+**Illustrative population:** 100,000 labeled toy sessions: 100 positive and 99,900 benign. Suppose the detector catches 90 positive sessions and wrongly flags 5% of benign sessions.
+
+| Classification | True positive | False positive | False negative | True negative |
+|---|---:|---:|---:|---:|
+| Count | 90 | 4,995 | 10 | 94,905 |
+
+**Compute rather than guess:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Matrix:
+    tp: int
+    fp: int
+    fn: int
+    tn: int
+
+def evaluate(m: Matrix) -> dict[str, float | None]:
+    values = (m.tp, m.fp, m.fn, m.tn)
+    if any(type(v) is not int or v < 0 for v in values):
+        raise ValueError("counts must be nonnegative integers")
+    return {
+        "precision": m.tp / (m.tp + m.fp) if m.tp + m.fp else None,
+        "recall": m.tp / (m.tp + m.fn) if m.tp + m.fn else None,
+        "fpr": m.fp / (m.fp + m.tn) if m.fp + m.tn else None,
+    }
+
+result = evaluate(Matrix(tp=90, fp=4995, fn=10, tn=94905))
+assert round(result["precision"] * 100, 2) == 1.77
+assert result["recall"] == 0.90
+assert result["fpr"] == 0.05
+
+empty = evaluate(Matrix(tp=0, fp=0, fn=0, tn=100))
+assert empty["precision"] is None and empty["recall"] is None
+```
+
+**Interpretation:** 5,085 alerts arise from the toy evaluation, but only 90 are labeled true positives. Precision is approximately **1.77%**. A model with high recall can therefore be unusable if its alert burden exceeds analyst capacity. The exact rates depend on sampling and ground truth; synthetic results do not forecast performance on a live enterprise network.
+
+**Evidence quality before metrics:** if a logging source fails, the denominator may be incomplete. If event time is out of order, threshold correlation may be wrong. If labels are assigned only to already-alerted incidents, you cannot measure false negatives reliably. Metrics need dataset coverage, labeling method, clear definition of a *case* and traceable rule/model versions.
+
+**Security operations exercise:** estimate analyst time assuming each alert takes 4 minutes of triage. Compute 5,085 × 4 = 20,340 analyst minutes (~339 hours), *for this toy population*. Suggest a safe workflow to improve precision (contextual corroboration, multi-signal detections, tuning) without suppressing all rare incidents. Why is "automatically disable all flagged accounts" dangerous? Because attackers may exploit weak rules to deny service to legitimate users.
+
+
 ## 1. Data sources and blind spots
 
 | Source | Possible signal | Limits |

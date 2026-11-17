@@ -7,6 +7,68 @@
 ## Scenario
 You operate an approved local lab server. You need to understand why a client connects, how a packet differs from a message, and what TLS certificate verification really guarantees. You should never report an open port as proof of compromise.
 
+## Masterclass — DNS validation has a time-of-check/time-of-use boundary
+
+An application's "allowed URL" logic can appear correct while still contacting a forbidden destination. The problem is that a **hostname**, its **DNS response**, and the **actual connected peer address** are different facts. DNS can change between a preliminary check and connection, and an HTTP redirect can change the destination entirely. Treat each resolution/redirect as a new trust decision.
+
+**Defender's question:** may a server fetch `https://updates.example.test/check`? A hostname allowlist is only one control. It must be paired with the right network egress restrictions and verification of where the client *actually connects*. A substring check like `"example.test" in url` is not authorization.
+
+| Candidate URL | What a robust policy notices |
+|---|---|
+| `https://updates.example.test/check` | approved exact host, scheme and port |
+| `http://updates.example.test/check` | wrong scheme |
+| `https://updates.example.test.attacker.invalid` | hostname suffix is different |
+| `https://updates.example.test@127.0.0.1/` | user-info tricks human readers |
+| `https://updates.example.test:8443/` | unexpected port |
+| HTTP redirect to `127.0.0.1` | must re-validate destination |
+
+**Offline test — pure policy checks and a simulated DNS response:**
+
+```python
+# MASTERCLASS_RUNNABLE
+from urllib.parse import urlsplit
+import ipaddress
+
+EXPECTED_HOST = "updates.example.test"
+
+def approved_url(raw: str) -> bool:
+    if type(raw) is not str or not 1 <= len(raw) <= 512:
+        return False
+    try:
+        parsed = urlsplit(raw)
+        return (parsed.scheme == "https"
+                and parsed.hostname == EXPECTED_HOST
+                and parsed.username is None
+                and parsed.password is None
+                and parsed.port in (None, 443)
+                and not parsed.fragment)
+    except ValueError:
+        return False
+
+def simulated_public_destination(address_text: str) -> bool:
+    address = ipaddress.ip_address(address_text)
+    return address.is_global
+
+assert approved_url("https://updates.example.test/check")
+for bad in (
+    "http://updates.example.test/check",
+    "https://updates.example.test.attacker.invalid/",
+    "https://updates.example.test@127.0.0.1/",
+    "https://updates.example.test:8443/",
+):
+    assert not approved_url(bad)
+assert not simulated_public_destination("127.0.0.1")
+assert not simulated_public_destination("169.254.169.254")
+assert simulated_public_destination("8.8.8.8")
+```
+
+**What this code deliberately does *not* do:** it does not fetch the URL, follow redirects, resolve DNS, validate certificates, or prove that a connection is safe. `ipaddress.is_global` is a useful property but not a complete organizational egress policy. The string `updates.example.test` is an invented lab allowlist target. A production fetcher typically needs fixed approved destinations, restricted outbound network paths, careful resolution/connect handling and a maximum total response size/deadline.
+
+**Separate concepts:** TCP connect success establishes reachability at one moment; TLS certificate validation can establish a server identity under a trust store and hostname rules; neither authorizes that server to receive sensitive user data. An API resource permission check must still happen at the application layer.
+
+**Transfer exercise:** imagine the initial hostname resolves to a public IP but the actual connection uses a loopback IP. Which check was invalidated? Propose a design where the destination policy is enforced at the network boundary in addition to application validation. Explain why redirects need repeated policy checks.
+
+
 ## 1. From application data to packets
 
 Think in layers:
