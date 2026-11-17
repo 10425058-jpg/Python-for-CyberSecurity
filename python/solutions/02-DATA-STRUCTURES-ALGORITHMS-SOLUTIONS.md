@@ -205,15 +205,18 @@ assert [x[1] for x in sorted(events,key=lambda x:x[0])]==['earlier','first','sec
 ```python
 def ms(a):
     if len(a)<2: return a.copy()
-    k=len(a)//2; l=ms(a[:k]); r=ms(a[k:]); out=[]
-    while l and r:
-        if l[0]<=r[0]: out.append(l.pop(0))
-        else: out.append(r.pop(0))
-    return out+l+r
+    k=len(a)//2; left=ms(a[:k]); right=ms(a[k:])
+    out=[]; i=j=0
+    while i<len(left) and j<len(right):
+        if left[i]<=right[j]:
+            out.append(left[i]); i+=1
+        else:
+            out.append(right[j]); j+=1
+    return out+left[i:]+right[j:]
 assert ms([3,1,-1,2])==[-1,1,2,3]
 ```
 
-**Reasoning:** This pedagogical implementation repeatedly pops at the front, so it does NOT achieve the optimized O(N log N) merge cost.
+**Reasoning:** The merge uses index pointers instead of list.pop(0), preserving O(N log N) time for standard mergesort. Slices and output arrays add O(N) auxiliary storage.
 
 **Cybersecurity/engineering limitation:** Use index pointers for efficient merging; incorrect complexity claims are bugs in documentation.
 
