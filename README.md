@@ -4,6 +4,10 @@
 
 > **Safety:** Operate only on systems, traffic and data you own or have explicit written permission to assess. The repository uses synthetic data and loopback-first examples. Tools are educational, not production-hardened scanners or forensic acquisition systems.
 
+## Python Foundations — 12 expanded textbook chapters (00–11)
+
+**Start with the [complete Python textbook](python/README.md).** The original twelve `python/` chapters are now substantial beginner-to-advanced teaching modules, not short reference notes. Each adds a first-principles explanation, local runnable code with assertions, a step-by-step trace, input failure scenarios, and beginner/intermediate/advanced exercises. [The dedicated CI suite](tests/test_python_textbook_chapters.py) executes one complete standard-library example per chapter, while the [editorial checklist](reference/PYTHON-FOUNDATIONS-TEXTBOOK-RUBRIC.md) tracks learning quality. This is the recommended starting point **before** the specialized Cybersecurity course.
+
 ## New: Masterclass Quality Pass — every Deep Dive chapter
 
 **All 22 chapters** now include an individually designed *Masterclass* teaching case: a subtle misconception, an explicit causal model, a concrete comparison table, one **standalone, tested Python example**, and an independent transfer exercise. The new examples focus on correctness **and** what the code does not prove. They cover Python type/key collisions, false all-clears, exact sliding-window alert semantics, bounded parsing, SQL rollback, per-object authorization, mutation tests, TaskGroup failure propagation, DNS/SSRF trust, HMAC replay, SOC base rates, timestamp uncertainty, TCP capture gaps, benign high entropy, incomplete cloud inventories, vulnerability applicability, ML leakage and more.
@@ -21,7 +25,7 @@ Read the [Deep Dive Masterclass chapters](course/README.md), then complete the c
 
 ## Start with the **Deep Dive — Expanded Third Edition**
 
-The older `python/` and `security/` pages are **short topic overviews**. The expanded [**22-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.
+The expanded `python/00–11` pages are now **full Python textbook lessons**, while the `security/` pages remain compact overviews. The expanded [**22-unit detailed course**](course/README.md) expands them into substantial English lessons with theory, step-by-step explanations, annotated code, security pitfalls, trace tables, self-check questions and worked answer checks.
 
 **Recommended reading order:**
 
