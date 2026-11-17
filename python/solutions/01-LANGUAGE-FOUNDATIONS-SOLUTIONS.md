@@ -98,7 +98,7 @@ for v in (True, False, 2.0, '2', -1, 101):
 
 ```python
 from decimal import Decimal
-assert (0.1+0.2)==0.3 is False
+assert (0.1 + 0.2) != 0.3
 assert Decimal('0.1')+Decimal('0.2')==Decimal('0.3')
 ```
 
