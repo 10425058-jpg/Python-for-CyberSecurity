@@ -2,6 +2,10 @@
 
 **Preflight for every lab:** scope is your own device/VM, 127.0.0.1, or the provided synthetic fixture; no external probing. Record Python/OS versions, input hashes, exact commands, observed behavior, test results and limitations. Use a new `.venv` for optional packages.
 
+## Complete 22-lab pathway
+
+The [guided lab manual](../lab-manual/README.md) contains one runnable lab for every Deep Dive chapter, including negative tests, exact expected signals, and a grading rubric. The original workshop and 20-lab overviews below remain available.
+
 ## New fully guided workshops
 
 The original 20-lab overview is supplemented by four longer worked exercises with annotated code, explicit expected results, failure scenarios and report templates:
