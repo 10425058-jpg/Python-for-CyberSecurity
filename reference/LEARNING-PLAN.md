@@ -2,6 +2,8 @@
 
 This schedule is an ambitious introduction to Python security engineering. Mastery takes longer and depends on project feedback. Adjust pace based on tests and depth, not calendar alone.
 
+> **Deep-dive supplement:** The [19-unit Second Edition](../course/README.md) has step-by-step explanations, worked examples and four guided workshops. Spend as long as needed on each unit; the monthly schedule is a pacing aid, not a mastery guarantee.
+
 ## 12-month plan
 | Month | Python knowledge | Security context | Deliverable |
 |---|---|---|---|

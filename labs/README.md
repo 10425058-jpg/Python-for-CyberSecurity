@@ -2,6 +2,15 @@
 
 **Preflight for every lab:** scope is your own device/VM, 127.0.0.1, or the provided synthetic fixture; no external probing. Record Python/OS versions, input hashes, exact commands, observed behavior, test results and limitations. Use a new `.venv` for optional packages.
 
+## New fully guided workshops
+
+The original 20-lab overview is supplemented by four longer worked exercises with annotated code, explicit expected results, failure scenarios and report templates:
+
+- [Binary protocol parser](../workshops/01-BINARY-FRAMING.md)
+- [Offline mini SOC and timestamp windows](../workshops/02-MINI-SOC-DETECTION.md)
+- [Cryptography](../workshops/03-CRYPTOGRAPHY-LAB.md)
+- [Evidence hashes and incident timeline](../workshops/04-INCIDENT-TIMELINE.md)
+
 ## Lab 01 — Local environment, 45–90 minutes
 **Concepts:** interpreter, venv, imports, shell, Git.
 1. Run `python --version` and `python -m venv .venv`.

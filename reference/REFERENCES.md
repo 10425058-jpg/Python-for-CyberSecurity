@@ -52,3 +52,6 @@ Prefer primary/official documentation. Links may evolve; always confirm the curr
 - Incident response and forensics courses with explicit isolated lab requirements.
 
 **Reading policy:** verify publication/version dates for security guidance. Do not copy proprietary course text into the repo. Summarize in your own words, attribute sources and link to originals.
+
+## Verified incident response guidance
+- [NIST SP 800-61 Revision 3 (final April 2025)](https://csrc.nist.gov/pubs/sp/800/61/r3/final) — current incident response risk-management guidance superseding Revision 2.
